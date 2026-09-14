@@ -1,0 +1,28 @@
+# Render "Blueprint" — lets Render auto-configure the service the moment
+# this repo is connected, instead of someone re-typing build/start commands
+# by hand in the dashboard. `next start` already respects the `PORT` env
+# var Render injects, so no extra wiring is needed there.
+#
+# Free tier note: this is a single persistent Node process (matches how the
+# app already runs locally), which is what the in-memory store (see
+# src/lib/store/memory.ts) needs — a serverless/edge host would reset the
+# gallery and leaderboard on every request. The tradeoff of "free": the
+# service spins down after 15 minutes with no traffic and cold-starts (and
+# loses that in-memory data) on the next visit — acceptable for a hobby
+# launch, worth revisiting (a real Store adapter) if this needs to stay up
+# reliably.
+services:
+  - type: web
+    name: alpona
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      # Update this once Render assigns the live URL (shown in its
+      # dashboard after the first deploy) — it's used for canonical links,
+      # Open Graph tags, and sitemap generation.
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://alpona.onrender.com
