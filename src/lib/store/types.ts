@@ -1,4 +1,4 @@
-import type { PublishedWorld, Scene } from '../types'
+import type { ExtraPlacement, PublishedWorld, Scene, SceneAdjust } from '../types'
 
 export type Board = 'overall' | 'trending' | 'loved' | 'recent'
 
@@ -19,11 +19,13 @@ export interface ListResult {
  * this, so moving from the in-memory adapter to Postgres/KV is one new file.
  */
 export interface Store {
-  publish(input: { scene: Scene; title: string; nickname: string; description?: string }): Promise<PublishedWorld>
+  publish(input: { scene: Scene; title: string; nickname: string; description?: string; adjust?: SceneAdjust; extras?: ExtraPlacement[] }): Promise<PublishedWorld>
   get(id: string): Promise<PublishedWorld | null>
   list(q: ListQuery): Promise<ListResult>
   /** Idempotent: a second vote from the same voter is a no-op, not an error. */
   vote(id: string, voterId: string): Promise<{ world: PublishedWorld; counted: boolean }>
+  /** Idempotent the other way too: un-voting when you never voted is a no-op. */
+  unvote(id: string, voterId: string): Promise<{ world: PublishedWorld; counted: boolean }>
   hasVoted(id: string, voterId: string): Promise<boolean>
   votedIds(voterId: string): Promise<string[]>
   report(id: string, voterId: string): Promise<void>

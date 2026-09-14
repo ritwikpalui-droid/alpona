@@ -9,7 +9,7 @@ import { blob, Ink, ridge, smooth, Specks, Wash, type Pt } from '../art/primitiv
  * ------------------------------------------------------------------ */
 
 /** One bloom: n petal washes around a slightly off-centre heart. */
-function Bloom({ r, x, y, rad, petals = 6, color, heart, opacity = 0.5 }: {
+export function Bloom({ r, x, y, rad, petals = 6, color, heart, opacity = 0.5 }: {
   r: Rng; x: number; y: number; rad: number; petals?: number; color: string; heart?: string; opacity?: number
 }) {
   const start = r() * Math.PI * 2

@@ -1,4 +1,4 @@
-# Puja World 2026 — Architecture
+# Alpona — Architecture
 
 > Choose a world. Build your Puja. Make it beautiful. Share it. Get votes.
 

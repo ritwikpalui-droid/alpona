@@ -13,17 +13,17 @@ interface Props { params: Promise<{ id: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
   const world = await store.get(id)
-  if (!world) return { title: 'Puja World not found' }
+  if (!world) return { title: 'Alpona not found' }
 
   const description = world.description
-    || `A Puja World imagined by ${world.nickname}: ${describeScene(world)}. ${world.votes.toLocaleString('en-IN')} votes so far.`
+    || `An Alpona imagined by ${world.nickname}: ${describeScene(world)}. ${world.votes.toLocaleString('en-IN')} votes so far.`
 
   return {
     title: world.title,
     description,
     alternates: { canonical: `/w/${world.id}` },
     openGraph: {
-      title: `${world.title} · Puja World 2026`,
+      title: `${world.title} · Alpona`,
       description,
       type: 'article',
       images: [{ url: `/w/${world.id}/opengraph-image`, width: 1200, height: 630 }],
@@ -57,7 +57,8 @@ export default async function WorldPage({ params }: Props) {
       <div className="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="overflow-hidden rounded-3xl bg-paper-2 ring-1 ring-ink/10">
-            <SceneCanvas scene={world.scene} alive className="aspect-[4/5] w-full" title={world.title} />
+            {/* Not `alive` — see the note on SceneCanvasProps.alive. */}
+            <SceneCanvas scene={world.scene} adjust={world.adjust} extras={world.extras} className="aspect-[4/5] w-full" title={world.title} />
           </div>
 
           <div className="flex flex-col">

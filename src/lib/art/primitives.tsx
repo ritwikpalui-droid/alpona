@@ -172,18 +172,24 @@ export function ArtDefs() {
       <filter id="blur-lg" x="-30%" y="-30%" width="160%" height="160%">
         <feGaussianBlur stdDeviation="26" />
       </filter>
+
     </defs>
   )
 }
 
-/** The paper the whole thing is painted on. */
+/**
+ * The paper the whole thing is painted on — just the flat colour. The grain
+ * texture is layered on separately, once, by whoever composites the final
+ * scene (SceneCanvas already does this, gated to the one full-quality
+ * canvas). It used to live here too: harmless-looking, but SVG's `url(#id)`
+ * references resolve across the WHOLE document, not per-<svg> — so every
+ * cheap "thumb" card on a page that also has one full canvas (e.g. the
+ * homepage hero) was silently inheriting and re-computing that same
+ * feTurbulence filter, multiplying an expensive effect by however many
+ * cards were on the page. That was the real cause of the scroll/render lag.
+ */
 export function Paper({ tone = '#F2ECE1' }: { tone?: string }) {
-  return (
-    <>
-      <rect width="1000" height="1500" fill={tone} />
-      <rect width="1000" height="1500" filter="url(#paper-grain)" opacity={0.05} style={{ mixBlendMode: 'multiply' }} />
-    </>
-  )
+  return <rect width="1000" height="1500" fill={tone} />
 }
 
 /**
@@ -194,6 +200,25 @@ export function Paper({ tone = '#F2ECE1' }: { tone?: string }) {
  * rail, a gallery grid — a fixed id would mean every instance renders with
  * whichever vignette happened to land first in the DOM.
  */
+/**
+ * A soft contact shadow beneath the pandal/idol group.
+ *
+ * Every painted object is a flat, frontal cutout at a fixed box — but the
+ * world paintings behind it were each generated independently, at whatever
+ * camera height and angle suited that subject (an aerial tea-garden vista,
+ * a steep upward look at Howrah Bridge, a street-level shot). Those camera
+ * mismatches can't be papered over per-combination — there are 12×12×12 of
+ * them. What a shadow buys instead: it reads as "object placed in front of
+ * a backdrop," the way a diorama or a hand-assembled collage works, rather
+ * than an attempted (and failing) illusion of one seamless photograph. That
+ * reframes the mismatch from a bug into the app's actual visual convention.
+ */
+export function GroundShadow({ cx, cy, rx, ry = 34, opacity = 0.24, color = '#2A2621' }: {
+  cx: number; cy: number; rx: number; ry?: number; opacity?: number; color?: string
+}) {
+  return <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={color} opacity={opacity} filter="url(#blur-lg)" />
+}
+
 export function Vignette({ color = '#5A4A38', strength = 0.16 }: { color?: string; strength?: number }) {
   const id = `vig-${useId().replace(/[^a-zA-Z0-9]/g, '')}`
   return (

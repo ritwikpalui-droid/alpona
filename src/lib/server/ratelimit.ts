@@ -10,7 +10,7 @@ interface Bucket { tokens: number; last: number }
 // instantiate this module more than once per process across bundling layers,
 // so the map lives on globalThis to guarantee every caller shares one bucket
 // per key rather than one per layer.
-const GLOBAL_KEY = Symbol.for('puja-world.ratelimit.v1')
+const GLOBAL_KEY = Symbol.for('alpona.ratelimit.v1')
 const buckets: Map<string, Bucket> =
   ((globalThis as Record<symbol, unknown>)[GLOBAL_KEY] ??= new Map<string, Bucket>()) as Map<string, Bucket>
 

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { castVote } from '@/lib/client/api'
+import { castUnvote, castVote } from '@/lib/client/api'
 
 /**
- * Voting (§22): one tap, optimistic, no login wall. The server is the source
- * of truth for whether it counted — the heart fills either way so a repeat
- * tap never feels like a rejection, it just stops incrementing.
+ * Voting (§22): one tap, optimistic, no login wall. Tapping again un-votes —
+ * a heart that only ever fills and never empties reads as broken, not as a
+ * feature, and this is still one shared rate-limit bucket either direction
+ * so toggling back and forth isn't a spam vector.
  */
 export default function VoteButton({
   id, votes, voted, size = 'md', onVoted,
@@ -22,24 +23,30 @@ export default function VoteButton({
   const [busy, setBusy] = useState(false)
   const [justVoted, setJustVoted] = useState(false)
 
-  const cast = async (e: React.MouseEvent) => {
+  const toggle = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (has || busy) return
+    if (busy) return
+    const wasVoted = has
     setBusy(true)
-    setHas(true)
-    setCount(c => c + 1)
-    setJustVoted(true)
-    setTimeout(() => setJustVoted(false), 500)
+    setHas(!wasVoted)
+    setCount(c => c + (wasVoted ? -1 : 1))
+    if (!wasVoted) {
+      setJustVoted(true)
+      setTimeout(() => setJustVoted(false), 500)
+    }
     try {
-      const res = await castVote(id)
+      const res = wasVoted ? await castUnvote(id) : await castVote(id)
       setCount(res.votes)
-      if (!res.counted) setHas(true) // already voted server-side; keep the filled state
+      // `counted: false` just means the server already agreed with the
+      // direction we're toggling to (e.g. a duplicate tap) — not a failure —
+      // so the optimistic `has` set above already matches. Nothing to redo.
       onVoted?.({ votes: res.votes, rank: res.rank, gap: res.gap })
     } catch {
-      // Roll back only the optimistic increment; a real anonymous voter rarely
-      // gets rejected, and re-showing an empty heart reads as a broken button.
-      setCount(c => Math.max(votes, c - 1))
+      // Roll back the optimistic change; a real anonymous voter rarely gets
+      // rejected, and leaving the button in the wrong state reads as broken.
+      setHas(wasVoted)
+      setCount(votes)
     } finally {
       setBusy(false)
     }
@@ -50,10 +57,10 @@ export default function VoteButton({
   return (
     <button
       type="button"
-      onClick={cast}
-      disabled={busy && !has}
+      onClick={toggle}
+      disabled={busy}
       aria-pressed={has}
-      aria-label={has ? `${count} votes, you voted` : `Vote for this Puja World, ${count} votes so far`}
+      aria-label={has ? `${count} votes — tap to remove your vote` : `Vote for this Alpona, ${count} votes so far`}
       className={[
         'inline-flex shrink-0 items-center gap-1.5 rounded-full border font-medium transition-all duration-300',
         dims,

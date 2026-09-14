@@ -34,7 +34,7 @@ export default function WorldCard({
           </span>
         )}
         <div className="h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.22,0.61,0.24,1)] group-hover:scale-[1.035]">
-          <SceneCanvas scene={world.scene} className="h-full w-full" title={world.title} variant={eager ? 'full' : 'thumb'} />
+          <SceneCanvas scene={world.scene} adjust={world.adjust} extras={world.extras} className="h-full w-full" title={world.title} variant={eager ? 'full' : 'thumb'} />
         </div>
       </div>
       <div className="flex items-start justify-between gap-2 p-3">

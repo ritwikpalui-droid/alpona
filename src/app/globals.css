@@ -74,14 +74,36 @@
 
   ::selection { background: color-mix(in oklab, var(--color-marigold) 32%, transparent); }
 
-  /* Horizontal option rails: swipe, snap, no visible scrollbar. */
+  /* Horizontal option rails: swipe, snap, no visible scrollbar.
+   *
+   * IMPORTANT — do not put `touch-action: pan-x` back on this container.
+   * It was tried here to make taps register more reliably, but `touch-action`
+   * restricts the WHOLE gesture, not just what this element does: a finger
+   * that lands on a card and drags upward to scroll the *page* gets that
+   * gesture intersected with this container's `pan-x` and vertical scrolling
+   * is dropped entirely for any gesture starting here — which is exactly the
+   * "vertical scroll only broken where a horizontal rail is" bug this was
+   * reported as. Tap latency belongs on the tappable element itself
+   * (`.rail a`, `.rail button` below), never on the scroller.
+   */
   .rail {
-    scroll-snap-type: x mandatory;
-    -webkit-overflow-scrolling: touch;
+    /* `proximity`, not `mandatory`: mandatory snapping obliges the browser to
+     * continuously enforce a snap point on every scroll frame (including
+     * ones that merely pass near this rail during an ordinary page scroll),
+     * which is real, recurring work for the browser to do. Proximity only
+     * snaps once a scroll naturally comes to rest near a card — same "settle
+     * on a card" feel, without the standing cost. */
+    scroll-snap-type: x proximity;
+    /* Stop a horizontal overscroll at the rail's edge from chaining into the
+     * page (or the browser's back-swipe gesture). */
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
   }
   .rail::-webkit-scrollbar { display: none; }
   .rail > * { scroll-snap-align: center; }
+  /* Fast, unambiguous taps on the cards themselves — without constraining
+   * the rail's own scroll-gesture direction. */
+  .rail a, .rail button { touch-action: manipulation; }
 }
 
 /* ==================================================================
@@ -130,9 +152,14 @@
    Slow, soft, organic. Nothing bounces.
    ================================================================== */
 
+/* No `filter: blur()` here on purpose: this class lands on a full-viewport
+ * <svg> that already runs its own internal SVG filters (watercolour bleed,
+ * paper grain). Animating a CSS blur filter on TOP of that forces the
+ * browser to re-rasterize the whole thing every frame — on a mid-range
+ * phone that reads as lag and flicker, not a graceful reveal. */
 @keyframes paint-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); filter: blur(6px); }
-  to   { opacity: 1; transform: none; filter: blur(0); }
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
 }
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(14px); }
@@ -158,14 +185,20 @@
 @keyframes a-fall       { 0% { transform: translate(0,-24px) rotate(0) } 100% { transform: translate(18px,34px) rotate(38deg) } }
 @keyframes a-ripple     { 0%,100% { transform: translateX(0); opacity: .28 } 50% { transform: translateX(11px); opacity: .5 } }
 
-.alive .a-drift      { animation: a-drift 11s ease-in-out infinite; }
-.alive .a-drift-slow { animation: a-drift-slow 26s ease-in-out infinite; }
-.alive .a-bob        { animation: a-bob 7s ease-in-out infinite; }
-.alive .a-twinkle > * { animation: a-twinkle 4.5s ease-in-out infinite; }
-.alive .a-glide > *  { animation: a-glide 14s ease-in-out infinite; }
-.alive .a-rain       { animation: a-rainfall 1.1s linear infinite; }
-.alive .a-fall > *   { animation: a-fall 9s ease-in-out infinite alternate; }
-.alive .a-ripple > * { animation: a-ripple 6s ease-in-out infinite; }
+/* `will-change` hints the browser to promote each animated node to its own
+ * compositor layer up front, isolating it from the surrounding SVG (which
+ * carries active feTurbulence filters). Without it, animating opacity/
+ * transform here can force the browser to repaint the whole filtered canvas
+ * on every frame instead of just this element — measured at a flat 30fps
+ * instead of 60fps on the reveal screen before this was added. */
+.alive .a-drift      { animation: a-drift 11s ease-in-out infinite; will-change: transform; }
+.alive .a-drift-slow { animation: a-drift-slow 26s ease-in-out infinite; will-change: transform; }
+.alive .a-bob        { animation: a-bob 7s ease-in-out infinite; will-change: transform; }
+.alive .a-twinkle > * { animation: a-twinkle 4.5s ease-in-out infinite; will-change: opacity; }
+.alive .a-glide > *  { animation: a-glide 14s ease-in-out infinite; will-change: transform; }
+.alive .a-rain       { animation: a-rainfall 1.1s linear infinite; will-change: transform; }
+.alive .a-fall > *   { animation: a-fall 9s ease-in-out infinite alternate; will-change: transform; }
+.alive .a-ripple > * { animation: a-ripple 6s ease-in-out infinite; will-change: transform, opacity; }
 
 /* Honour the system setting and the in-app toggle equally. */
 @media (prefers-reduced-motion: reduce) {
@@ -183,16 +216,37 @@ html[data-motion="off"] *::after {
   transition-duration: 0.01ms !important;
 }
 
-/* Safe-area padding for the floating picker on notched phones. */
-.pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+/*
+ * Safe-area padding for the floating picker/reveal cards. `env(safe-area-
+ * inset-bottom)` only reports HARDWARE insets (an iPhone's home indicator)
+ * — it's 0 on Android, even on phones whose browser draws its own
+ * persistent bottom toolbar (reported: Samsung Internet's address/tab bar
+ * sitting under the reveal screen's Publish button, unreachable). `100dvh`
+ * doesn't reliably exclude that toolbar either on every engine/version.
+ * The floor here (1.75rem, well past any single browser bar's height) is
+ * the actual fix — a real px buffer beneath whatever the OS reports, not
+ * just the safe-area env var alone.
+ */
+.pb-safe { padding-bottom: max(1.75rem, env(safe-area-inset-bottom) + 0.75rem); }
 .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
 
-/* A layer arriving on the page, painted rather than switched on. */
+/* The JS-measured height from ViewportHeightVar — see that component for
+ * why `100svh` alone wasn't enough. `100svh` is only the fallback for the
+ * instant before that effect runs. */
+.h-app-vh { height: var(--app-vh, 100svh); }
+
+/* A layer arriving on the page, painted rather than switched on.
+ * Opacity only, deliberately: this animates INSIDE the wc-rough/wc-soft
+ * feTurbulence filter groups. A `transform` here changes the filtered
+ * content's geometry every frame, so the displacement map genuinely differs
+ * frame to frame and can't be reused — that's real, measured main-thread
+ * cost on top of an already-expensive filter. A pure opacity fade still
+ * reads as the layer settling into place, without moving what's under it. */
 @keyframes layer-paint {
-  from { opacity: 0; transform: translateY(8px) scale(1.012); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.layer-paint { animation: layer-paint 0.9s var(--ease-paint) both; transform-origin: 50% 60%; }
+.layer-paint { animation: layer-paint 0.5s var(--ease-paint) both; }
 
 
 /* Sound-card waveform, animating while a preview plays. */

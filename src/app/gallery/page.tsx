@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import Header from '@/components/Header'
+import AdSlot from '@/components/AdSlot'
 import GalleryClient from '@/components/gallery/GalleryClient'
 import { store } from '@/lib/store'
 import { getVoter } from '@/lib/server/voter'
 
 export const metadata: Metadata = {
-  title: 'Gallery — Puja World 2026',
-  description: 'Browse imagined Durga Puja worlds built by the community: watercolour ghats, pandals and Durgas, each one a scene someone composed themselves.',
+  title: 'Gallery — Alpona',
+  description: 'Browse Alponas built by the community: watercolour ghats, pandals and Durgas, each one a scene someone composed themselves.',
 }
 
 export default async function GalleryPage() {
@@ -21,13 +22,14 @@ export default async function GalleryPage() {
       <Header />
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14">
         <p className="eyebrow mb-2">Gallery</p>
-        <h1 className="display mb-8 text-[30px] sm:text-[38px]">Puja Worlds, built by everyone</h1>
+        <h1 className="display mb-8 text-[30px] sm:text-[38px]">Alponas, built by everyone</h1>
         <GalleryClient
           initialWorlds={result.worlds}
           initialVoted={voted}
           initialBoard="trending"
           initialCursor={result.nextCursor}
         />
+        <AdSlot placement="gallery" />
       </div>
     </div>
   )

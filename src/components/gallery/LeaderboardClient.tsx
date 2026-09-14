@@ -62,7 +62,8 @@ export default function LeaderboardClient({
             <div className="mb-8 overflow-hidden rounded-3xl bg-ink text-paper">
               <div className="grid sm:grid-cols-2">
                 <div className="relative aspect-[4/5] sm:aspect-auto">
-                  <SceneCanvas scene={champion.scene} alive className="h-full w-full" title={champion.title} />
+                  {/* Not `alive` — see the note on SceneCanvasProps.alive. */}
+                  <SceneCanvas scene={champion.scene} adjust={champion.adjust} extras={champion.extras} className="h-full w-full" title={champion.title} />
                 </div>
                 <div className="flex flex-col justify-center p-6 sm:p-9">
                   <p className="eyebrow mb-3 text-paper/60">#1 · {TABS.find(t => t.id === board)?.label}</p>
@@ -77,7 +78,7 @@ export default function LeaderboardClient({
                   <div className="rounded-2xl border border-paper/20 p-4">
                     <p className="display mb-2 text-[16px]">🥇 Can you beat this?</p>
                     <Link href="/create" className="inline-block rounded-full bg-paper px-5 py-2.5 text-[13px] font-medium text-ink transition-transform hover:scale-[1.02]">
-                      Create your own Puja World
+                      Create your own Alpona
                     </Link>
                   </div>
                 </div>

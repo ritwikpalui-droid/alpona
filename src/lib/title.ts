@@ -23,6 +23,10 @@ const PLACE: Record<string, string> = {
   rooftop: 'the Rooftops',
   'rainy-kolkata': 'Wet Kolkata',
   'misty-valley': 'the Valley',
+  ocean: 'the Ocean',
+  'mountain-pass': 'the Mountain Pass',
+  'banyan-canopy': 'the Banyan Tree',
+  'paddy-fields': 'the Paddy Fields',
 }
 
 const LIGHT: Record<string, string> = {
@@ -76,7 +80,7 @@ export function generateTitle(scene: Scene): string {
   if (durga?.meta.tags.includes('fierce')) candidates.push(place ? `She Arrives at ${place}` : 'She Arrives')
   if (light) candidates.push(`${light}`)
 
-  if (!candidates.length) return 'My Puja World'
+  if (!candidates.length) return 'My Alpona'
   // Prefer the most specific phrasing; vary deterministically among the top few.
   return titleCase(r.pick(candidates.slice(0, Math.min(4, candidates.length))))
 }

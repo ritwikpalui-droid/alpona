@@ -6,11 +6,14 @@ import Link from 'next/link'
  */
 export default function Header({ variant = 'default' }: { variant?: 'default' | 'quiet' }) {
   return (
-    <header className={`sticky top-0 z-40 ${variant === 'quiet' ? '' : 'bg-paper/85 backdrop-blur-md'}`}>
+    // `bg-paper/95` instead of a blurred, translucent background: a sticky
+    // `backdrop-filter: blur()` re-blurs the full header width on every
+    // single scroll frame, on every page — a real, measured mobile cost for
+    // an effect barely visible against a ground that's already `--color-paper`.
+    <header className={`sticky top-0 z-40 ${variant === 'quiet' ? '' : 'bg-paper/95'}`}>
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-8">
-        <Link href="/" className="group flex items-baseline gap-2" aria-label="Puja World 2026, home">
-          <span className="display text-[17px] tracking-tight text-ink">Puja World</span>
-          <span className="eyebrow text-[10px] text-ink-3 transition-colors group-hover:text-ink-2">2026</span>
+        <Link href="/" className="flex items-baseline gap-2" aria-label="Alpona, home">
+          <span className="display text-[17px] tracking-tight text-ink">Alpona</span>
         </Link>
         <nav className="flex items-center gap-1 text-[13px]">
           <Link href="/gallery" className="rounded-full px-3 py-2 text-ink-2 transition-colors hover:text-ink">Gallery</Link>

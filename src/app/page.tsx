@@ -28,7 +28,12 @@ export default async function Home() {
       {/* ------------------------------------------------------------ hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.9]">
-          <SceneCanvas scene={HERO_SCENE} alive className="h-full w-full scale-110" title="A Puja World, imagined" />
+          {/* Not `alive`: this backdrop is mostly obscured by the gradient and
+              headline anyway, and a large, CSS-scaled, filter-heavy SVG with
+              continuous ambient animation is exactly the combination that
+              causes visible lag/flicker on a mid-range phone. A still scene
+              keeps the mood without the cost. */}
+          <SceneCanvas scene={HERO_SCENE} className="h-full w-full scale-110" title="An Alpona, imagined" />
           <div className="absolute inset-0 bg-gradient-to-b from-paper/10 via-paper/55 to-paper" />
         </div>
 
@@ -52,7 +57,7 @@ export default async function Home() {
               href="/gallery"
               className="w-full rounded-full border border-ink/18 px-8 py-4 text-center text-[14.5px] text-ink-2 transition-colors hover:border-ink/35 hover:text-ink sm:w-auto"
             >
-              Explore Puja Worlds
+              Explore Alponas
             </Link>
           </div>
         </div>
@@ -85,7 +90,7 @@ export default async function Home() {
       <section className="border-y border-ink/8 bg-paper-2/60">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
           <div className="mb-7 text-center">
-            <p className="eyebrow mb-2">🏆 Puja Worlds 2026</p>
+            <p className="eyebrow mb-2">🏆 This year&apos;s best Alponas</p>
             <h2 className="display text-[26px] sm:text-[32px]">Can you make it to #1?</h2>
           </div>
           <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-3">
@@ -137,7 +142,7 @@ export default async function Home() {
       </section>
 
       <footer className="border-t border-ink/8 px-5 py-8 text-center text-[12px] text-ink-3 sm:px-8">
-        Puja World 2026 — an independent, unofficial creative project for Durga Puja.
+        Alpona — an independent, unofficial creative project for Durga Puja.
       </footer>
     </div>
   )

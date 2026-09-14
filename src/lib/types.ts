@@ -29,6 +29,12 @@ export interface Box { x: number; y: number; w: number; h: number }
 /**
  * How an asset is painted. `proc` is the shipped placeholder language; `image`
  * is the drop-in slot for real painted artwork, one asset at a time.
+ *
+ * `w`/`h` are the source file's own natural pixel dimensions (not where it
+ * ends up on screen) — used to fit the image into its category's box
+ * (see CATEGORY_BOX in art/palette.ts) without stretching or cropping it,
+ * since different paintings of e.g. the same pandal category will have
+ * different natural proportions (a tall temple vs. a wide bamboo structure).
  */
 export type Art =
   | { kind: 'proc'; draw: (r: Rng, box: Box, scene: SceneContext) => ReactNode }
@@ -41,6 +47,14 @@ export interface SceneContext {
   lightTint: string
   isNight: boolean
   isWet: boolean
+  /**
+   * Where the light is coming FROM, normalised 0–1 on the canvas (x: left→
+   * right, y: top→bottom, so a low sun is a small y). Drives shadow offset/
+   * skew and the directional light wash — a single shared value so every
+   * grounded object is lit and shadowed consistently, instead of each
+   * layer guessing independently.
+   */
+  light: { x: number; y: number }
 }
 
 export interface Asset {
@@ -73,6 +87,36 @@ export interface SoundSpec {
 /** A scene is just category → asset id. Small, serialisable, URL-safe. */
 export type Scene = Partial<Record<CategoryId, string>>
 
+/**
+ * A user's manual nudge on top of the automatic placement — "move it a
+ * little left," "make her a bit bigger." `dx`/`dy` are canvas units (the
+ * 1000×1500 space), added to the auto-computed ground point; `scale`
+ * multiplies the auto-computed size. Anchored at the object's own ground
+ * point (see `placeOnGround` in art/palette.ts), so scaling grows an object
+ * from where it stands rather than from a corner — resizing a pandal
+ * doesn't walk its base off the ground it was just placed on.
+ */
+export interface LayerAdjust { dx: number; dy: number; scale: number }
+/** Which layers can be manually dragged/resized. Pandal/durga go through
+ *  the anchor-based `placeOnGround` (see art/palette.ts); lighting, flowers,
+ *  decor and ambience are simpler full-layer nudges (see `AdjustableLayer`
+ *  in SceneCanvas.tsx) since they're a whole-canvas effect or scatter, not a
+ *  single grounded figure. */
+export type AdjustableLayerId = 'pandal' | 'durga' | 'lighting' | 'flowers' | 'decor' | 'ambience'
+export type SceneAdjust = Partial<Record<AdjustableLayerId, LayerAdjust>>
+
+/**
+ * One user-placed small motif — a flower sprig, a lantern, a bird, a diya —
+ * "add more, put it where I want, make it whatever size and colour" rather
+ * than a single fixed full-canvas scatter. `motif` keys into the `MOTIFS`
+ * registry (src/lib/art/motifs.tsx). `color`, when the motif is colorable,
+ * is chosen per-instance — "this tree in red, that one in lavender" needs
+ * the same motif rendered differently per placement, not a global choice.
+ * `x`/`y` are direct canvas coordinates (unlike `LayerAdjust`, there's no
+ * "ground point" for a floating flower or light string to anchor to).
+ */
+export interface ExtraPlacement { id: string; motif: string; x: number; y: number; scale: number; color?: string }
+
 export type MatchLabel =
   | 'PERFECT MATCH' | 'WORKS BEAUTIFULLY' | 'INTERESTING' | 'UNEXPECTED'
 
@@ -97,6 +141,12 @@ export interface Category {
 export interface PublishedWorld {
   id: string
   scene: Scene
+  /** The creator's manual pandal/idol placement, if they made one — carried
+   *  through publish so the gallery and share cards show what they actually
+   *  arranged, not the auto-placement recomputed from scratch. */
+  adjust?: SceneAdjust
+  /** Any extra flowers/lights the creator placed by hand. */
+  extras?: ExtraPlacement[]
   title: string
   nickname: string
   description?: string

@@ -247,4 +247,5 @@ export const lightings: Asset[] = [
         {[0, 1, 2].map(i => <path key={i} d={`M ${180 + i * 170} -40 L ${300 + i * 170} -40 L ${520 + i * 200} 1200 L ${300 + i * 200} 1200 Z`} fill={P.cream} />)}
       </g></g>),
     { boost: ['mist', 'fog', 'wet'] }),
+
 ]

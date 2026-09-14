@@ -13,13 +13,13 @@ import { soundscapes } from './sounds'
  * catalogue module itself.
  */
 export const CATEGORIES: Category[] = [
-  { id: 'world', index: 1, label: 'World', question: 'Where should your Puja live?', assets: worlds },
-  { id: 'pandal', index: 2, label: 'Pandal', question: 'What kind of pandal?', assets: pandals },
-  { id: 'durga', index: 3, label: 'Durga', question: 'And how does she appear?', assets: durgaIdols },
-  { id: 'lighting', index: 4, label: 'Light', question: 'What light is falling on all this?', assets: lightings },
-  { id: 'flowers', index: 5, label: 'Flowers', question: 'Which flowers?', assets: flowers },
+  { id: 'world', index: 1, label: 'World', question: 'Where should your Puja live?', assets: worlds, optional: true },
+  { id: 'pandal', index: 2, label: 'Pandal', question: 'What kind of pandal?', assets: pandals, optional: true },
+  { id: 'durga', index: 3, label: 'Durga', question: 'And how does she appear?', assets: durgaIdols, optional: true },
+  { id: 'lighting', index: 4, label: 'Light', question: 'What light is falling on all this?', assets: lightings, optional: true },
+  { id: 'flowers', index: 5, label: 'Flowers', question: 'Which flowers?', assets: flowers, optional: true },
   { id: 'decor', index: 6, label: 'Decor', question: 'What else is there?', assets: decorations, optional: true },
-  { id: 'sky', index: 7, label: 'Sky', question: 'What is the sky doing?', assets: skies },
+  { id: 'sky', index: 7, label: 'Sky', question: 'What is the sky doing?', assets: skies, optional: true },
   { id: 'ambience', index: 8, label: 'Air', question: 'Anything moving in the air?', assets: ambiences, optional: true },
   { id: 'sound', index: 9, label: 'Sound', question: 'What can you hear?', assets: soundscapes, optional: true },
 ]

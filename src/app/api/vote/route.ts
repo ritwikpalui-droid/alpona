@@ -3,11 +3,13 @@ import { store } from '@/lib/store'
 import { clientKey, getVoter, voterCookie } from '@/lib/server/voter'
 import { LIMITS, take } from '@/lib/server/ratelimit'
 
-export async function POST(req: Request) {
+async function handle(req: Request, action: 'vote' | 'unvote') {
   const voter = await getVoter()
 
   // Two dimensions: the signed voter cookie, and a coarse client fingerprint.
-  // Clearing cookies to vote again still runs into the second bucket.
+  // Clearing cookies to vote again still runs into the second bucket. Voting
+  // and un-voting share one bucket — toggling the heart back and forth is
+  // still just "voting," rate-limit-wise.
   if (!take(`vote:${voter.id}`, LIMITS.vote) || !take(`vote:ip:${clientKey(req)}`, LIMITS.vote)) {
     return NextResponse.json({ error: 'rate_limited', message: 'Slow down a moment.' }, { status: 429 })
   }
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
   if (typeof id !== 'string' || !id) return NextResponse.json({ error: 'bad_request' }, { status: 400 })
 
   try {
-    const { world, counted } = await store.vote(id, voter.id)
+    const { world, counted } = action === 'vote' ? await store.vote(id, voter.id) : await store.unvote(id, voter.id)
     const [rank, gap] = await Promise.all([store.rank(id), store.gapToNext(id)])
     const res = NextResponse.json({ votes: world.votes, counted, rank, gap })
     if (voter.issued) res.cookies.set(await voterCookie(voter.id))
@@ -26,4 +28,13 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: 'not_found' }, { status: 404 })
   }
+}
+
+export async function POST(req: Request) {
+  return handle(req, 'vote')
+}
+
+/** Un-vote — tapping an already-filled heart again. */
+export async function DELETE(req: Request) {
+  return handle(req, 'unvote')
 }

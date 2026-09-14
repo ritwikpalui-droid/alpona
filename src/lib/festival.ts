@@ -11,7 +11,7 @@ function date(env: string | undefined, fallback: string): number {
 
 export const FESTIVAL = {
   year: 2026,
-  name: 'Puja World 2026',
+  name: 'Alpona',
   /** Creation and voting open. */
   opensAt: date(process.env.NEXT_PUBLIC_PUJA_OPENS, '2026-10-10T00:00:00+05:30'),
   /** The "final days to vote" push begins. */

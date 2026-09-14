@@ -63,11 +63,17 @@ export default function OptionRail({
             onClick={() => onSelect(asset.id)}
             className={[
               'group relative w-[136px] shrink-0 overflow-hidden rounded-2xl text-left',
-              'transition-[transform,box-shadow] duration-500 ease-[cubic-bezier(0.22,0.61,0.24,1)]',
+              // Only `transform` transitions — `box-shadow` can't be composited,
+              // so animating it repaints this card's whole SVG every frame for
+              // the transition's duration. Ring stays width-2 always so only
+              // its *colour* changes (cheap) instead of its width (a layout-
+              // adjacent repaint too). The drop shadow was the same problem in
+              // a bigger radius; the ring alone still reads clearly as "chosen."
+              'transition-transform duration-300 ease-[cubic-bezier(0.22,0.61,0.24,1)]',
               'sm:w-[150px]',
               isActive
-                ? 'scale-[1.015] shadow-[0_10px_34px_-16px_rgba(35,32,27,0.5)] ring-2 ring-ink'
-                : 'ring-1 ring-ink/12 hover:ring-ink/28 active:scale-[0.985]',
+                ? 'scale-[1.015] ring-2 ring-ink'
+                : 'ring-2 ring-ink/12 hover:ring-ink/28 active:scale-[0.985]',
             ].join(' ')}
           >
             <div className="relative aspect-[4/5] w-full overflow-hidden bg-paper-2">

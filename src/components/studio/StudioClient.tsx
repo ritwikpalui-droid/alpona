@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { Scene } from '@/lib/types'
+import type { Asset, ExtraPlacement, Scene, SceneAdjust } from '@/lib/types'
 import { CATEGORIES, TOTAL_STEPS, getAsset, getCategory } from '@/lib/assets'
 import { hasContext, rankOptions, rerollOne, surprise } from '@/lib/compat'
 import { clearDraft, isComplete, loadDraft, saveDraft } from '@/lib/scene'
@@ -10,6 +10,7 @@ import { generateTitle } from '@/lib/title'
 import { playSound, setMuted, stopSound } from '@/lib/audio'
 import SceneCanvas from '@/components/SceneCanvas'
 import OptionRail from './OptionRail'
+import AdjustPanel from './AdjustPanel'
 import Reveal from './Reveal'
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
@@ -19,12 +20,19 @@ export default function StudioClient() {
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<'build' | 'reveal'>('build')
   const [title, setTitle] = useState<string | null>(null)
+  const [adjust, setAdjust] = useState<SceneAdjust>({})
+  const [extras, setExtras] = useState<ExtraPlacement[]>([])
   const [resumed, setResumed] = useState(false)
   const [muted, setMutedState] = useState(false)
   const [hydrated, setHydrated] = useState(false)
+  // Adding flowers/lights/etc. doesn't need to wait for Reveal — it's scene-
+  // wide decoration, not tied to any one step, so it gets its own full-screen
+  // overlay reachable from any step of the build flow, not just the end.
+  const [elementsOpen, setElementsOpen] = useState(false)
 
   const category = CATEGORIES[step]
   const stageRef = useRef<HTMLDivElement>(null)
+  const elementsSvgRef = useRef<SVGSVGElement>(null)
 
   /* ---------------------------------------------------------------- draft */
 
@@ -40,6 +48,8 @@ export default function StudioClient() {
       setScene(d.scene)
       setStep(Math.min(d.step ?? 0, TOTAL_STEPS - 1))
       if (d.title) setTitle(d.title)
+      if (d.adjust) setAdjust(d.adjust)
+      if (d.extras) setExtras(d.extras)
       setResumed(true)
     }
     setHydrated(true)
@@ -48,8 +58,8 @@ export default function StudioClient() {
 
   useEffect(() => {
     if (!hydrated) return
-    saveDraft({ scene, step, title: title ?? undefined })
-  }, [scene, step, title, hydrated])
+    saveDraft({ scene, step, title: title ?? undefined, adjust, extras })
+  }, [scene, step, title, adjust, extras, hydrated])
 
   useEffect(() => () => { stopSound() }, [])
 
@@ -59,8 +69,17 @@ export default function StudioClient() {
   const showLabels = useMemo(() => hasContext(scene, category.id), [scene, category.id])
   const chosen = scene[category.id]
 
+  // A saved draft can outlive the asset it points to — a category gets
+  // reorganised (chandeliers moved from Lighting into Elements, say) and
+  // whatever's sitting in someone's localStorage from before that change
+  // still has the old id. `getAsset` returning undefined for it is
+  // expected, not exceptional, so this drops the pill instead of asserting
+  // non-null and crashing on `.name` a few lines down at render time —
+  // exactly what happened here.
   const chosenLayers = useMemo(
-    () => CATEGORIES.filter(c => scene[c.id]).map(c => ({ cat: c, asset: getAsset(c.id, scene[c.id])! })),
+    () => CATEGORIES
+      .map(c => ({ cat: c, asset: getAsset(c.id, scene[c.id]) }))
+      .filter((l): l is { cat: typeof l.cat; asset: Asset } => l.asset != null),
     [scene],
   )
 
@@ -68,6 +87,13 @@ export default function StudioClient() {
 
   const select = useCallback((id: string) => {
     setScene(prev => ({ ...prev, [category.id]: id }))
+    // A manual position/size was tuned for the PREVIOUS asset's shape —
+    // carrying it onto a newly-chosen pandal/idol would misplace that one
+    // instead. Clearing it here means the new choice starts auto-placed,
+    // same as if it had never been touched.
+    if (category.id === 'pandal' || category.id === 'durga') {
+      setAdjust(prev => { const next = { ...prev }; delete next[category.id as 'pandal' | 'durga']; return next })
+    }
     setResumed(false)
     if (category.id === 'sound') {
       const spec = getCategory('sound').assets.find(a => a.id === id)?.sound
@@ -84,6 +110,8 @@ export default function StudioClient() {
     const next = surprise()
     setScene(next)
     setTitle(null)
+    setAdjust({})
+    setExtras([])
     setResumed(false)
     stopSound()
   }, [])
@@ -91,7 +119,26 @@ export default function StudioClient() {
   const changeOne = useCallback(() => {
     setScene(prev => rerollOne(prev, category.id))
     setTitle(null)
+    if (category.id === 'pandal' || category.id === 'durga') {
+      setAdjust(prev => { const next = { ...prev }; delete next[category.id as 'pandal' | 'durga']; return next })
+    }
   }, [category.id])
+
+  // "Skip" used to only appear before a choice was made — once you'd picked
+  // something for an optional category, the only way forward was "Change
+  // this" to a DIFFERENT one, never back to none at all. Reported as "I'm
+  // then bound to take any other at least." This clears the category (same
+  // action Skip already takes when nothing's chosen yet) and moves on,
+  // whether or not something was chosen.
+  const skipCategory = useCallback(() => {
+    setScene(prev => { const next = { ...prev }; delete next[category.id]; return next })
+    setTitle(null)
+    if (category.id === 'pandal' || category.id === 'durga') {
+      setAdjust(prev => { const next = { ...prev }; delete next[category.id as 'pandal' | 'durga']; return next })
+    }
+    if (category.id === 'sound') stopSound()
+    goto(step + 1)
+  }, [category.id, goto, step])
 
   const toggleMute = useCallback(() => {
     setMutedState(m => { setMuted(!m); return !m })
@@ -102,6 +149,8 @@ export default function StudioClient() {
     setScene({})
     setStep(0)
     setTitle(null)
+    setAdjust({})
+    setExtras([])
     setResumed(false)
     stopSound()
   }, [])
@@ -127,12 +176,19 @@ export default function StudioClient() {
         muted={muted}
         onToggleMute={toggleMute}
         onEdit={() => { setMode('build'); stopSound() }}
+        adjust={adjust}
+        onAdjustChange={setAdjust}
+        extras={extras}
+        onExtrasChange={setExtras}
       />
     )
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-paper lg:flex-row">
+    // `100svh`, not `h-dvh` — see the note in Reveal.tsx: this is fixed,
+    // overflow-hidden, with the Next/Reveal button anchored at the bottom,
+    // so it needs the guaranteed-visible height, not the largest possible one.
+    <div className="h-app-vh flex flex-col overflow-hidden bg-paper lg:flex-row">
       {/* ------------------------------------------------ stage (canvas) */}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {/* top bar: progress, nothing else */}
@@ -152,6 +208,14 @@ export default function StudioClient() {
             </span>
 
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setElementsOpen(true)}
+                aria-label="Add elements"
+                className="rounded-full px-3 py-2 text-[13px] text-ink-2 transition-colors hover:text-ink"
+              >
+                <span aria-hidden>🌼</span><span className="ml-1.5 hidden sm:inline">Add elements</span>
+              </button>
               <button
                 type="button"
                 onClick={doSurprise}
@@ -195,11 +259,13 @@ export default function StudioClient() {
 
         {/* the artwork — the largest thing on the screen, always (§4) */}
         <div ref={stageRef} className="min-h-0 flex-1 overflow-hidden">
+          {/* Not `alive` — see the note on SceneCanvasProps.alive. */}
           <SceneCanvas
             scene={scene}
-            alive
+            adjust={adjust}
+            extras={extras}
             className="h-full w-full"
-            title={title ?? 'Your Puja world, in progress'}
+            title={title ?? 'Your Alpona, in progress'}
           />
         </div>
 
@@ -265,13 +331,13 @@ export default function StudioClient() {
         </div>
 
         <div className="mt-3 flex items-center gap-2.5 pb-4">
-          {category.optional && !chosen && (
+          {category.optional && (
             <button
               type="button"
-              onClick={() => goto(step + 1)}
+              onClick={skipCategory}
               className="rounded-full border border-ink/14 px-5 py-3 text-[14px] text-ink-2 transition-colors hover:border-ink/30 hover:text-ink"
             >
-              Skip
+              {chosen ? 'Remove' : 'Skip'}
             </button>
           )}
           {isLast ? (
@@ -281,7 +347,7 @@ export default function StudioClient() {
               disabled={!ready}
               className="flex-1 rounded-full bg-ink px-6 py-3.5 text-[14px] font-medium text-paper transition-transform duration-300 enabled:hover:scale-[1.015] enabled:active:scale-[0.985] disabled:opacity-35"
             >
-              {ready ? 'Reveal my Puja World' : 'A few layers still to choose'}
+              {ready ? 'Reveal my Alpona' : 'A few layers still to choose'}
             </button>
           ) : (
             <button
@@ -295,6 +361,26 @@ export default function StudioClient() {
           )}
         </div>
       </div>
+
+      {elementsOpen && (
+        <div className="h-app-vh fixed inset-0 z-50 bg-paper">
+          <SceneCanvas
+            ref={elementsSvgRef}
+            scene={scene}
+            adjust={adjust}
+            extras={extras}
+            className="h-full w-full"
+            title={title ?? 'Your Alpona, in progress'}
+          />
+          <AdjustPanel
+            entry="elements"
+            svgRef={elementsSvgRef}
+            adjust={adjust} onAdjustChange={setAdjust}
+            extras={extras} onExtrasChange={setExtras}
+            onDone={() => setElementsOpen(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }

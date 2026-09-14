@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Puja World 2026',
-    short_name: 'Puja World',
+    name: 'Alpona',
+    short_name: 'Alpona',
     description: "Don't just visit a Puja. Build your own.",
     start_url: '/',
     display: 'standalone',

@@ -32,7 +32,7 @@ interface Row extends PublishedWorld {
  * to keep a single Prisma Client across Next.js's module duplication.
  */
 interface StoreState { rows: Map<string, Row>; votesByVoter: Map<string, Set<string>> }
-const GLOBAL_KEY = Symbol.for('puja-world.memory-store.v1')
+const GLOBAL_KEY = Symbol.for('alpona.memory-store.v1')
 const state: StoreState = ((globalThis as Record<symbol, unknown>)[GLOBAL_KEY] ??= {
   rows: new Map<string, Row>(),
   votesByVoter: new Map<string, Set<string>>(),
@@ -55,7 +55,7 @@ function trendingScore(w: Row, now: number): number {
 
 function toPublic(w: Row, now = Date.now()): PublishedWorld {
   return {
-    id: w.id, scene: w.scene, title: w.title, nickname: w.nickname,
+    id: w.id, scene: w.scene, adjust: w.adjust, extras: w.extras, title: w.title, nickname: w.nickname,
     description: w.description, votes: w.votes, createdAt: w.createdAt,
     recentVotes: w.voteTimes.filter(t => now - t < TRENDING_WINDOW_MS).length,
     editorsPick: w.editorsPick, reports: w.reporters.size,
@@ -136,12 +136,12 @@ function sorted(board: Board): Row[] {
 }
 
 export const memoryStore: Store = {
-  async publish({ scene, title, nickname, description }) {
+  async publish({ scene, title, nickname, description, adjust, extras }) {
     seed()
     const now = Date.now()
     const rowId = id(now ^ Math.floor(Math.random() * 0xffffff))
     const row: Row = {
-      id: rowId, scene, title, nickname, description, votes: 0, createdAt: now,
+      id: rowId, scene, adjust, extras, title, nickname, description, votes: 0, createdAt: now,
       recentVotes: 0, voters: new Set(), reporters: new Set(), voteTimes: [],
     }
     rows.set(rowId, row)
@@ -176,6 +176,21 @@ export const memoryStore: Store = {
     const set = votesByVoter.get(voterId) ?? new Set()
     set.add(id)
     votesByVoter.set(voterId, set)
+    return { world: toPublic(w), counted: true }
+  },
+
+  async unvote(id, voterId) {
+    seed()
+    const w = rows.get(id)
+    if (!w) throw new Error('not_found')
+    if (!w.voters.has(voterId)) return { world: toPublic(w), counted: false }
+    w.voters.delete(voterId)
+    w.votes = Math.max(0, w.votes - 1)
+    // voteTimes has no per-voter mapping — dropping the most recent entry is
+    // a fine approximation for the trending heuristic (vote/unvote pairs
+    // happen close together in time for whoever's toggling).
+    w.voteTimes.pop()
+    votesByVoter.get(voterId)?.delete(id)
     return { world: toPublic(w), counted: true }
   },
 

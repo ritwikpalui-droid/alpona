@@ -17,6 +17,7 @@ let noiseBuffer: AudioBuffer | null = null
 let stopFns: Array<() => void> = []
 let current: SoundSpec | null = null
 let muted = false
+let recordDest: MediaStreamAudioDestinationNode | null = null
 
 function audio(): AudioContext {
   if (!ctx) {
@@ -241,3 +242,19 @@ export async function previewSound(spec: SoundSpec | undefined): Promise<void> {
 }
 
 export function currentSpec(): SoundSpec | null { return current }
+
+/**
+ * A `MediaStream` carrying whatever the synth engine is currently playing —
+ * for recording a gift video, not for anything a listener ever hears
+ * directly. Fans `master` out to a second destination alongside the real
+ * speakers (`connect()` supports multiple destinations from one node), so
+ * capturing audio never changes what actually plays out loud.
+ */
+export function captureAudioStream(): MediaStream {
+  const c = audio()
+  if (!recordDest) {
+    recordDest = c.createMediaStreamDestination()
+    master!.connect(recordDest)
+  }
+  return recordDest.stream
+}

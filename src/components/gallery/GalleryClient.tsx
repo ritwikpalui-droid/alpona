@@ -79,7 +79,7 @@ export default function GalleryClient({
       {worlds.length === 0 && !loading ? (
         <div className="rounded-3xl border border-dashed border-ink/16 py-20 text-center">
           <p className="display mb-2 text-[20px]">Nothing here yet</p>
-          <p className="mb-5 text-[13.5px] text-ink-2">Be the first to publish a Puja World in this view.</p>
+          <p className="mb-5 text-[13.5px] text-ink-2">Be the first to publish an Alpona in this view.</p>
           <Link href="/create" className="inline-block rounded-full bg-ink px-6 py-3 text-[13.5px] font-medium text-paper">Create mine →</Link>
         </div>
       ) : (

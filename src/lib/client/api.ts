@@ -35,6 +35,18 @@ export async function castVote(id: string): Promise<VoteResponse> {
   return data
 }
 
+/** Tapping an already-filled heart again — takes the vote back. */
+export async function castUnvote(id: string): Promise<VoteResponse> {
+  const res = await fetch('/api/vote', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data?.message ?? 'Could not undo your vote.')
+  return data
+}
+
 export async function reportWorld(id: string): Promise<void> {
   await fetch('/api/report', {
     method: 'POST',

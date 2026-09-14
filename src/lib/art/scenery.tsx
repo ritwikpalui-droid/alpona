@@ -8,9 +8,9 @@ export function Ground({ r, y, color, second }: { r: Rng; y: number; color: stri
   const d = smooth([...top, [W + 40, 1540], [-40, 1540]] as Pt[], true)
   return (
     <g>
-      <Wash d={d} color={color} opacity={0.36} />
-      {second && <Wash d={blob(r, 500, y + 260, 560, 150, 9, 0.28)} color={second} opacity={0.2} rim={false} />}
-      <Ink pts={top} r={r} width={2} opacity={0.32} />
+      <Wash d={d} color={color} opacity={0.5} />
+      {second && <Wash d={blob(r, 500, y + 260, 560, 150, 9, 0.28)} color={second} opacity={0.3} rim={false} />}
+      <Ink pts={top} r={r} width={2.4} opacity={0.48} />
     </g>
   )
 }
@@ -22,16 +22,16 @@ export function Water({ r, y, color, glint = P.cream }: { r: Rng; y: number; col
   const lines = Array.from({ length: 9 }, (_, i) => {
     const ly = y + 30 + i * i * 4.2 + r.jitter(8)
     const x1 = r.range(40, 420), x2 = x1 + r.range(160, 420)
-    return { ly, x1, x2, o: 0.34 - i * 0.03 }
+    return { ly, x1, x2, o: 0.46 - i * 0.03 }
   })
   return (
     <g>
-      <Wash d={d} color={color} opacity={0.34} />
+      <Wash d={d} color={color} opacity={0.46} />
       <Wash d={smooth([...ridge(r, -40, W + 40, y + 170, 20, 7), [W + 40, 1540], [-40, 1540]] as Pt[], true)}
-        color={color} opacity={0.18} rim={false} />
+        color={color} opacity={0.26} rim={false} />
       <g stroke={glint} strokeLinecap="round" fill="none">
         {lines.map((l, i) => (
-          <path key={i} d={smooth(ridge(r, l.x1, l.x2, l.ly, 3, 4))} strokeWidth={r.range(2, 5)} opacity={Math.max(0.08, l.o)} />
+          <path key={i} d={smooth(ridge(r, l.x1, l.x2, l.ly, 3, 4))} strokeWidth={r.range(2, 5)} opacity={Math.max(0.12, l.o)} />
         ))}
       </g>
     </g>
@@ -76,10 +76,10 @@ export function Peaks({ r, y, colors, snow }: { r: Rng; y: number; colors: strin
         const d = smooth([...pts, [W + 60, 1540], [-60, 1540]] as Pt[], true)
         return (
           <g key={layer}>
-            <Wash d={d} color={c} opacity={0.3 - layer * 0.05} />
-            {layer === colors.length - 1 && <Ink pts={pts} r={lr} width={2} opacity={0.3} />}
+            <Wash d={d} color={c} opacity={0.44 - layer * 0.05} />
+            {layer === colors.length - 1 && <Ink pts={pts} r={lr} width={2.4} opacity={0.46} />}
             {snow && layer === colors.length - 1 && (
-              <g fill={P.paper} opacity={0.5}>
+              <g fill={P.paper} opacity={0.62}>
                 {pts.filter((_, i) => i % 3 === 2).map(([px, py], i) => (
                   <path key={i} d={blob(lr, px, py + 34, 44, 26, 7, 0.4)} />
                 ))}
@@ -104,14 +104,23 @@ export function Trees({ r, x1, x2, baseY, n = 6, canopy, trunk = P.earth, scale 
         const s = scale * tr.range(0.75, 1.25)
         const y = baseY + tr.jitter(18)
         const th = 130 * s
+        const outerR = tr.fork('c0')
+        const outerCx = x + tr.jitter(26), outerCy = y - th - 26 * s
+        const outerPts: Pt[] = Array.from({ length: 10 }, (_, k) => {
+          const a = (k / 10) * Math.PI * 2
+          const rad = (76 - 12) * s * outerR.range(0.82, 1.14)
+          return [outerCx + Math.cos(a) * rad, outerCy + Math.sin(a) * rad * 0.86] as Pt
+        })
         return (
           <g key={i}>
-            <path d={`M ${x} ${y} L ${x + tr.jitter(8)} ${y - th}`} stroke={trunk} strokeWidth={9 * s} opacity={0.5} strokeLinecap="round" />
+            <path d={`M ${x} ${y} L ${x + tr.jitter(8)} ${y - th}`} stroke={trunk} strokeWidth={10 * s} opacity={0.62} strokeLinecap="round" />
+            <path d={`M ${x - 4 * s} ${y - th * 0.6} L ${x - 2 * s} ${y - th}`} stroke={trunk} strokeWidth={3 * s} opacity={0.3} strokeLinecap="round" />
             {canopy.map((c, ci) => (
               <path key={ci}
                 d={blob(tr.fork('c' + ci), x + tr.jitter(26), y - th - 26 * s + ci * 12 * s, (86 - ci * 12) * s, (66 - ci * 10) * s, 8, 0.34)}
-                fill={c} opacity={0.34 - ci * 0.06} />
+                fill={c} opacity={0.48 - ci * 0.07} />
             ))}
+            <Ink pts={outerPts} r={tr.fork('cink')} close width={2 * s} opacity={0.4} color={trunk} />
           </g>
         )
       })}
@@ -135,13 +144,13 @@ export function Buildings({ r, x1, x2, baseY, color, maxH = 300, n = 9, windows 
         const pts: Pt[] = [[x, baseY], [x + br.jitter(3), top], [x + bw + br.jitter(3), top + br.jitter(10)], [x + bw, baseY]]
         return (
           <g key={i}>
-            <path d={smooth(pts, true)} fill={color} opacity={0.34} />
-            <Ink pts={pts} r={br} width={1.8} opacity={0.34} />
+            <path d={smooth(pts, true)} fill={color} opacity={0.5} />
+            <Ink pts={pts} r={br} width={2.2} opacity={0.55} />
             {windows && (
-              <g fill={windowColor} opacity={0.62}>
+              <g fill={windowColor} opacity={0.78}>
                 {Array.from({ length: br.int(3, 8) }, (_, w) => (
                   <rect key={w} x={x + br.range(10, bw - 24)} y={top + br.range(18, h - 30)}
-                    width={br.range(9, 15)} height={br.range(11, 18)} rx={2} />
+                    width={br.range(10, 17)} height={br.range(13, 20)} rx={2} />
                 ))}
               </g>
             )}
@@ -164,8 +173,8 @@ export function Steps({ r, y, color, n = 7 }: { r: Rng; y: number; color: string
         return (
           <g key={i}>
             <path d={smooth([...pts, [pts[pts.length - 1][0], sy + 30], [pts[0][0], sy + 30]] as Pt[], true)}
-              fill={color} opacity={0.2 + (i % 2) * 0.07} />
-            <Ink pts={pts} r={sr} width={1.7} opacity={0.26} />
+              fill={color} opacity={0.32 + (i % 2) * 0.08} />
+            <Ink pts={pts} r={sr} width={2.1} opacity={0.44} />
           </g>
         )
       })}

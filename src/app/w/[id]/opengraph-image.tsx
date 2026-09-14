@@ -10,7 +10,7 @@ import { getAsset } from '@/lib/assets'
  * The rich 9:16 share card (lib/export.ts) is what users actually post.
  */
 
-export const alt = 'A Puja World, imagined'
+export const alt = 'An Alpona, imagined'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
@@ -21,7 +21,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const light = getAsset('lighting', world?.scene.lighting)
   const sky = getAsset('sky', world?.scene.sky)
   const [c1, c2] = light?.palette ?? sky?.palette ?? ['#DE8F2C', '#33415E']
-  const title = world?.title ?? 'A Puja World'
+  const title = world?.title ?? 'An Alpona'
   const byline = world ? `by ${world.nickname}` : ''
   const votes = world ? `${world.votes.toLocaleString('en-IN')} votes` : ''
 
@@ -36,7 +36,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
         }}
       >
         <div style={{ display: 'flex', fontSize: 22, letterSpacing: 4, color: '#8A8071', textTransform: 'uppercase' }}>
-          PUJA WORLD 2026
+          ALPONA
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 920 }}>
           <div style={{ display: 'flex', fontSize: 76, lineHeight: 1.08, color: '#23201B' }}>{title}</div>
