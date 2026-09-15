@@ -107,14 +107,22 @@ export default function StudioClient() {
   }, [step])
 
   const doSurprise = useCallback(() => {
-    const next = surprise()
+    // Seeded with the CURRENT scene, not a blank one — Surprise me is "fill
+    // in whatever I haven't decided yet," not "throw out everything I've
+    // already chosen, including categories I stepped past several screens
+    // ago." `surprise()`'s own seed param already skips any category that
+    // has a value; passing nothing here silently discarded that and
+    // rerolled the entire scene from scratch (reported: manually-picked
+    // World/Pandal/Durga several steps back changed after a later tap on
+    // Surprise me, with no warning).
+    const next = surprise(Math.random, scene)
     setScene(next)
     setTitle(null)
     setAdjust({})
     setExtras([])
     setResumed(false)
     stopSound()
-  }, [])
+  }, [scene])
 
   const changeOne = useCallback(() => {
     setScene(prev => rerollOne(prev, category.id))
@@ -124,21 +132,34 @@ export default function StudioClient() {
     }
   }, [category.id])
 
-  // "Skip" used to only appear before a choice was made — once you'd picked
-  // something for an optional category, the only way forward was "Change
-  // this" to a DIFFERENT one, never back to none at all. Reported as "I'm
-  // then bound to take any other at least." This clears the category (same
-  // action Skip already takes when nothing's chosen yet) and moves on,
-  // whether or not something was chosen.
-  const skipCategory = useCallback(() => {
+  // Clears whatever's chosen for this category — shared by both buttons
+  // below. Never advances the step itself; the two callers decide that.
+  const clearCategory = useCallback(() => {
     setScene(prev => { const next = { ...prev }; delete next[category.id]; return next })
     setTitle(null)
     if (category.id === 'pandal' || category.id === 'durga') {
       setAdjust(prev => { const next = { ...prev }; delete next[category.id as 'pandal' | 'durga']; return next })
     }
     if (category.id === 'sound') stopSound()
+  }, [category.id])
+
+  // Nothing chosen yet: clear (a no-op) and move on — the original "Skip"
+  // behaviour.
+  const skipCategory = useCallback(() => {
+    clearCategory()
     goto(step + 1)
-  }, [category.id, goto, step])
+  }, [clearCategory, goto, step])
+
+  // Something WAS chosen: "Remove" used to also advance to the next
+  // category, identical to Skip — which meant there was no way to clear a
+  // pick and reconsider without first clicking Back a whole step. Reported
+  // ("Remove" silently skipped ahead) and confirmed: this now only clears
+  // the selection and stays on the same question, reverting the button
+  // back to "Skip" so the person can pick something else or skip forward
+  // on their own next tap.
+  const removeSelection = useCallback(() => {
+    clearCategory()
+  }, [clearCategory])
 
   const toggleMute = useCallback(() => {
     setMutedState(m => { setMuted(!m); return !m })
@@ -334,7 +355,7 @@ export default function StudioClient() {
           {category.optional && (
             <button
               type="button"
-              onClick={skipCategory}
+              onClick={chosen ? removeSelection : skipCategory}
               className="rounded-full border border-ink/14 px-5 py-3 text-[14px] text-ink-2 transition-colors hover:border-ink/30 hover:text-ink"
             >
               {chosen ? 'Remove' : 'Skip'}

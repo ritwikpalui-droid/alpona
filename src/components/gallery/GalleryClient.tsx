@@ -61,7 +61,11 @@ export default function GalleryClient({
 
   return (
     <div>
-      <div className="rail -mx-5 mb-6 flex gap-2 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+      {/* The mask fades the trailing edge so a row that scrolls (there are 4
+          pills — "Newest" sits just past the fold on a typical phone width)
+          doesn't look like a complete, finished row with nothing more to
+          it. Off at `sm:` and up, where all four normally already fit. */}
+      <div className="rail -mx-5 mb-6 flex gap-2 overflow-x-auto px-5 [mask-image:linear-gradient(to_right,black_calc(100%-28px),transparent)] sm:mx-0 sm:px-0 sm:[mask-image:none]">
         {TABS.map(t => (
           <button
             key={t.id}

@@ -85,6 +85,7 @@ export default function AdjustPanel({
   const [selectedExtra, setSelectedExtra] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const dragRef = useRef<{ startX: number; startY: number; baseDx: number; baseDy: number; scale: number } | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const isElements = target === 'elements'
   const layerAdjust = !isElements ? (adjust[target] ?? { dx: 0, dy: 0, scale: 1 }) : null
@@ -111,6 +112,22 @@ export default function AdjustPanel({
     // it permanently.
     setDragging(true)
   }
+  // An extra's x/y are absolute canvas coordinates (unlike a layer's dx/dy,
+  // which are an offset from a pivot) — with nothing keeping them on
+  // screen, dragging one far enough down used to tuck it fully behind the
+  // closed control panel, where it stayed invisible (and "editable" only in
+  // the sense that a slider could change a value nobody could see change).
+  // Reads the panel's own live position instead of a guessed constant, so
+  // this keeps working if the panel's height ever changes.
+  function clampExtraY(rawY: number): number {
+    const svgRect = svgRef.current?.getBoundingClientRect()
+    const panelRect = panelRef.current?.getBoundingClientRect()
+    if (!svgRect || !panelRect) return Math.max(0, Math.min(H, rawY))
+    const scale = Math.max(svgRect.width / 1000, svgRect.height / 1500)
+    const maxCanvasY = (panelRect.top - svgRect.top) / scale - 24
+    return Math.max(0, Math.min(maxCanvasY, rawY))
+  }
+
   function onPointerMove(e: React.PointerEvent) {
     const d = dragRef.current
     if (!d) return
@@ -118,7 +135,7 @@ export default function AdjustPanel({
     const y = d.baseDy + (e.clientY - d.startY) / d.scale
     if (isElements) {
       if (!current) return
-      onExtrasChange(extras.map(e => e.id === current.id ? { ...e, x, y } : e))
+      onExtrasChange(extras.map(e => e.id === current.id ? { ...e, x: Math.max(0, Math.min(W, x)), y: clampExtraY(y) } : e))
     } else {
       onAdjustChange({ ...adjust, [target]: { dx: x, dy: y, scale: layerAdjust?.scale ?? 1 } })
     }
@@ -153,7 +170,21 @@ export default function AdjustPanel({
 
   function addExtra(motif: string) {
     const id = newExtraId(motif)
-    const next: ExtraPlacement = { id, motif, x: W / 2 + jitter(160), y: H * 0.62 + jitter(160), scale: 1 }
+    // Independent random jitter around one fixed centre used to place a
+    // SECOND (or third, ...) item right on top of whatever was already
+    // there often enough to matter — two draws from the same range land
+    // close together more often than it sounds, and a motif's own artwork
+    // is easily wide enough to fully hide a same-sized neighbour a few
+    // dozen units away. Spiralling each new one out from the last at a
+    // fixed angular step (the golden angle, so it never re-aligns with an
+    // earlier item) guarantees real separation instead of leaving it to
+    // chance — the first item still spawns dead-centre, same as before.
+    const n = extras.length
+    const angle = n * 2.399963229728653
+    const radius = n === 0 ? 0 : 70 + (n - 1) * 36
+    const cx = W / 2 + Math.cos(angle) * radius
+    const cy = H * 0.62 + Math.sin(angle) * radius * 0.6
+    const next: ExtraPlacement = { id, motif, x: cx + jitter(40), y: cy + jitter(40), scale: 1 }
     onExtrasChange([...extras, next])
     setSelectedExtra(id)
   }
@@ -184,7 +215,7 @@ export default function AdjustPanel({
           dragging ? 'pointer-events-none translate-y-2 opacity-0' : 'opacity-100'
         }`}
       >
-        <div className="card-paper mx-auto max-w-md rounded-3xl p-5">
+        <div ref={panelRef} className="card-paper mx-auto max-w-md rounded-3xl p-5">
           {entry === 'placement' && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {(['pandal', 'durga', 'lighting', 'flowers', 'decor', 'ambience'] as Target[]).map(t => (

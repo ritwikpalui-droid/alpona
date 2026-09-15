@@ -53,6 +53,12 @@ export default function Reveal({
   const [template, setTemplate] = useState<CardTemplateId>('classic')
   const [customAudio, setCustomAudio] = useState<File | null>(null)
   const [giftResult, setGiftResult] = useState<{ blob: Blob; ext: string; meta: GiftCardMeta; url: string } | null>(null)
+  // Which action actually led to the 'gifted' screen — "Sent" was shown
+  // either way, but Save never transmits anything anywhere (it's a local
+  // download the sender has to forward themselves), and even Share only
+  // opens the OS share sheet without confirming where the person actually
+  // sent it. Tracking this is what lets the confirmation say something true.
+  const [giftAction, setGiftAction] = useState<'share' | 'save' | null>(null)
 
   const shareLabel = useMemo(() => canShareFiles() ? 'Share' : 'Save image', [])
 
@@ -143,6 +149,7 @@ export default function Reveal({
     setBusy(true); setError(null)
     try {
       await shareGiftCard(giftResult.blob, giftResult.meta, giftResult.ext)
+      setGiftAction('share')
       setPhase('gifted')
     } catch (e) {
       setError((e as Error).message || 'Could not open the share sheet. Try Save instead.')
@@ -154,6 +161,7 @@ export default function Reveal({
   function doGiftSave() {
     if (!giftResult) return
     downloadBlob(giftResult.blob, giftCardFilename(giftResult.meta, giftResult.ext))
+    setGiftAction('save')
     setPhase('gifted')
   }
 
@@ -229,7 +237,16 @@ export default function Reveal({
       {/* title + actions, rising in after the artwork has had a moment alone */}
       <div className={`pb-safe absolute inset-x-0 bottom-0 px-5 pb-5 sm:px-8 ${openPanel ? 'pointer-events-none opacity-0' : ''}`}>
         <div className="rise mx-auto max-w-md" style={{ animationDelay: '0.6s' }}>
-          <div className="card-paper rounded-3xl p-5">
+          {/* `max-h` + `overflow-y-auto`, not just a bottom-anchored box that
+              grows upward freely: on a short viewport (a ~800px-tall laptop
+              window is common), the gift-card preview's own image/video plus
+              its heading and buttons can add up to more than the screen's
+              height. Without a cap this card simply extended above the top
+              of the (overflow-hidden) screen, taking its heading and the top
+              of the artwork with it — invisible, unscrollable, permanently
+              unreachable. Capping the CARD and letting it scroll internally
+              keeps its own top edge always on screen instead. */}
+          <div className="card-paper max-h-[82svh] overflow-y-auto rounded-3xl p-5">
             {phase === 'reveal' && (
               <>
                 <p className="eyebrow mb-1.5">Your Alpona</p>
@@ -323,9 +340,17 @@ export default function Reveal({
             {phase === 'gifted' && (
               <div>
                 <p className="eyebrow mb-1">Card ready</p>
-                <p className="display mb-4 text-[19px] leading-snug">
-                  {recipient ? `Sent, for ${recipient}.` : 'Sent.'}
+                <p className={`display text-[19px] leading-snug ${giftAction === 'save' ? 'mb-1.5' : 'mb-4'}`}>
+                  {giftAction === 'share'
+                    ? (recipient ? `Shared — hope ${recipient} loves it.` : 'Shared.')
+                    : (recipient ? `Saved, for ${recipient}.` : 'Saved.')}
                 </p>
+                {giftAction === 'save' && (
+                  <p className="mb-4 text-[13px] text-ink-2">
+                    Saved to your device — open WhatsApp, Instagram or however you&apos;d send a
+                    photo, and send it on{recipient ? ` to ${recipient}` : ''} yourself.
+                  </p>
+                )}
                 <button type="button" onClick={() => setPhase('reveal')} className="w-full rounded-full bg-ink px-5 py-3 text-[14px] font-medium text-paper transition-transform duration-300 hover:scale-[1.015] active:scale-[0.98]">
                   Done
                 </button>

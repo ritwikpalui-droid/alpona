@@ -129,8 +129,16 @@ function sorted(board: Board): Row[] {
   switch (board) {
     case 'trending': return all.sort((a, b) => trendingScore(b, now) - trendingScore(a, now))
     case 'recent': return all.sort((a, b) => b.createdAt - a.createdAt)
-    case 'loved':
+    // "Overall" and "Most Loved" used to be the exact same sort — two tabs
+    // a visitor could tap between and see zero difference, which reads as
+    // one of them being broken. Genuinely distinct now: "Most Loved" is
+    // pure crowd vote count (what the label says, nothing else); "Overall"
+    // additionally surfaces editor's picks first — a curated "best of
+    // everything" view rather than a second identical vote-count ranking.
     case 'overall':
+      return all.sort((a, b) =>
+        (b.editorsPick ? 1 : 0) - (a.editorsPick ? 1 : 0) || b.votes - a.votes || b.createdAt - a.createdAt)
+    case 'loved':
     default: return all.sort((a, b) => b.votes - a.votes || b.createdAt - a.createdAt)
   }
 }
