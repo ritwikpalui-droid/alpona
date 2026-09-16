@@ -671,6 +671,13 @@ export async function shareGiftCard(blob: Blob, meta: GiftCardMeta, ext: string)
     await navigator.share({ files: [file], title, text: meta.message })
   } catch (err) {
     // AbortError just means the user closed the sheet without picking anything.
-    if ((err as Error)?.name !== 'AbortError') throw err
+    if ((err as Error)?.name === 'AbortError') return
+    // Some mobile browsers reject `share()` itself for a video file even
+    // after `canShare()` said yes (seen as a bare "Permission denied" —
+    // that's the browser's own DOMException message, not anything this app
+    // wrote). Re-throwing the raw error surfaced that exact confusing
+    // native text to the person sharing; wrapping it means they always see
+    // something they can act on instead.
+    throw new Error('Couldn’t open the share sheet for this — try Save instead.')
   }
 }

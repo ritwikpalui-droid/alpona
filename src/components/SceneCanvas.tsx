@@ -182,7 +182,7 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
             <ellipse cx={groundCx + shadowDx} cy={groundY} rx={footW * 0.6} ry={16}
               fill="#2A2621" opacity={0.24} filter="url(#blur-lg)" transform={`skewX(${(0.5 - ctx.light.x) * 26})`} />
           )}
-          <g filter={filter ? `url(#${filterId})` : undefined}>
+          <g data-adjust-target="durga" filter={filter ? `url(#${filterId})` : undefined}>
             <g transform={`translate(${placement.tx} ${placement.ty}) scale(${placement.s})`}>
               <image href={durgaAsset.art.src} x={0} y={0} width={durgaAnchorsBare.naturalW} height={durgaAnchorsBare.naturalH} />
             </g>
@@ -204,13 +204,20 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
             working": these two fallback branches used to render `<Layer>`
             with no adjust applied at all — `placeOnGround` (which DOES
             apply it) only ever runs for image-kind assets, and every
-            pandal/durga in the current library is procedural. */}
-        <AdjustableLayer adjust={adjust?.pandal} pivot={PANDAL_GROUND}>
-          <Layer scene={scene} cat="pandal" thumb={thumb} filter={soft} />
-        </AdjustableLayer>
-        <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
-          <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
-        </AdjustableLayer>
+            pandal/durga in the current library is procedural.
+            `data-adjust-target` is separate — it's what lets a tap directly
+            on the canvas (not just the bottom panel's tabs) pick which of
+            these two this drag/resize actually targets. */}
+        <g data-adjust-target="pandal">
+          <AdjustableLayer adjust={adjust?.pandal} pivot={PANDAL_GROUND}>
+            <Layer scene={scene} cat="pandal" thumb={thumb} filter={soft} />
+          </AdjustableLayer>
+        </g>
+        <g data-adjust-target="durga">
+          <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
+            <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
+          </AdjustableLayer>
+        </g>
       </>
     )
   }
@@ -224,12 +231,16 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
     return (
       <>
         {!thumb && <GroundShadow cx={pandalBox.x + pandalBox.w / 2} cy={pandalBox.y + pandalBox.h} rx={pandalBox.w * 0.32} />}
-        <AdjustableLayer adjust={adjust?.pandal} pivot={PANDAL_GROUND}>
-          <Layer scene={scene} cat="pandal" thumb={thumb} filter={soft} />
-        </AdjustableLayer>
-        <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
-          <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
-        </AdjustableLayer>
+        <g data-adjust-target="pandal">
+          <AdjustableLayer adjust={adjust?.pandal} pivot={PANDAL_GROUND}>
+            <Layer scene={scene} cat="pandal" thumb={thumb} filter={soft} />
+          </AdjustableLayer>
+        </g>
+        <g data-adjust-target="durga">
+          <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
+            <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
+          </AdjustableLayer>
+        </g>
       </>
     )
   }
@@ -273,7 +284,7 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
         fill="#2A2621" opacity={0.24} filter="url(#blur-lg)" transform={`skewX(${shadowSkew * 0.6})`} />
     )
     idol = (
-      <g filter={durgaFilter ? `url(#${durgaFilterId})` : undefined}>
+      <g data-adjust-target="durga" filter={durgaFilter ? `url(#${durgaFilterId})` : undefined}>
         <g transform={`translate(${idolPlacement.tx} ${idolPlacement.ty}) scale(${idolPlacement.s})`}>
           <image href={durgaAsset.art.src} x={0} y={0} width={durgaAnchors.naturalW} height={durgaAnchors.naturalH} />
         </g>
@@ -281,9 +292,11 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
     )
   } else if (durgaAsset?.art) {
     idol = (
-      <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
-        <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
-      </AdjustableLayer>
+      <g data-adjust-target="durga">
+        <AdjustableLayer adjust={adjust?.durga} pivot={DURGA_GROUND}>
+          <Layer scene={scene} cat="durga" thumb={thumb} filter={soft} />
+        </AdjustableLayer>
+      </g>
     )
   }
 
@@ -303,7 +316,7 @@ function PandalAndIdol({ scene, thumb, adjust }: { scene: Scene; thumb: boolean;
           fill="#2A2621" opacity={0.26} filter="url(#blur-lg)" transform={`skewX(${shadowSkew})`} />
       )}
 
-      <g filter={pandalFilter ? `url(#${pandalFilterId})` : undefined}>
+      <g data-adjust-target="pandal" filter={pandalFilter ? `url(#${pandalFilterId})` : undefined}>
         <g transform={`translate(${placement.tx} ${placement.ty}) scale(${placement.s})`}>
           <image href={pandalAsset.art.src} x={0} y={0} width={pandalAnchors.naturalW} height={pandalAnchors.naturalH} />
         </g>
@@ -337,6 +350,16 @@ function Extra({ placement }: { placement: ExtraPlacement }) {
   const r = rng(`extra:${placement.id}`)
   return (
     <g data-extra-id={placement.id} transform={`translate(${placement.x} ${placement.y}) scale(${placement.scale})`}>
+      {/* An invisible, generous hit target — SVG only hit-tests actually
+          painted pixels by default, and most motifs are thin ink strokes
+          plus one small filled shape near local (0,0), so a tap square in
+          the middle of "the bird" often lands in real, painted-nothing
+          space between the wing strokes and the tiny body. A transparent
+          fill still counts as "painted" for pointer-events purposes (a
+          standard SVG technique), which is what actually makes tap-to-
+          select on the canvas (see AdjustPanel's hit-test) work reliably
+          instead of only on the rare exact pixel. */}
+      <circle r={40} fill="transparent" pointerEvents="all" />
       {def.render(r, placement.color ?? def.swatch)}
     </g>
   )
@@ -445,13 +468,37 @@ export default function SceneCanvas({
         <g data-anim="chrome">
           <PandalAndIdol scene={scene} thumb={thumb} adjust={adjust} />
         </g>
+        {/* Same invisible-hit-target idea as `Extra`'s circle: a real
+            painted illustration still has real empty gaps (between roof
+            tiers, at a spire's point, the space around a raised arm), so a
+            tap square in the middle of "the pandal" can easily land on
+            nothing painted at all. These give tap-to-select a reliable,
+            generous target sized to each one's own layout box (the same
+            boxes auto-placement itself uses) instead of only the sparser
+            painted pixels. Durga's is drawn AFTER pandal's here on purpose:
+            their boxes overlap (she stands inside the pandal's opening), and
+            later-painted siblings win ties in `elementsFromPoint`'s stack —
+            a tap near the idol should select her, not the structure behind
+            her. Not shown to thumbs; nothing there is tappable. */}
+        {!thumb && (
+          <>
+            <rect data-adjust-target="pandal" x={CATEGORY_BOX.pandal!.x} y={CATEGORY_BOX.pandal!.y}
+              width={CATEGORY_BOX.pandal!.w} height={CATEGORY_BOX.pandal!.h} fill="transparent" pointerEvents="all" />
+            <rect data-adjust-target="durga" x={CATEGORY_BOX.durga!.x} y={CATEGORY_BOX.durga!.y}
+              width={CATEGORY_BOX.durga!.w} height={CATEGORY_BOX.durga!.h} fill="transparent" pointerEvents="all" />
+          </>
+        )}
         <g filter={soft} data-anim="chrome">
-          <AdjustableLayer adjust={adjust?.flowers} pivot={[500, 750]}>
-            <Layer scene={scene} cat="flowers" thumb={thumb} />
-          </AdjustableLayer>
-          <AdjustableLayer adjust={adjust?.decor} pivot={[500, 750]}>
-            <Layer scene={scene} cat="decor" thumb={thumb} />
-          </AdjustableLayer>
+          <g data-adjust-target="flowers">
+            <AdjustableLayer adjust={adjust?.flowers} pivot={[500, 750]}>
+              <Layer scene={scene} cat="flowers" thumb={thumb} />
+            </AdjustableLayer>
+          </g>
+          <g data-adjust-target="decor">
+            <AdjustableLayer adjust={adjust?.decor} pivot={[500, 750]}>
+              <Layer scene={scene} cat="decor" thumb={thumb} />
+            </AdjustableLayer>
+          </g>
         </g>
         {/* Individually-placed extras sit in their OWN group, outside the
             category layers above — each one gets its own `data-extra-id`

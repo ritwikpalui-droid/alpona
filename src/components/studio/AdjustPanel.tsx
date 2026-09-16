@@ -98,11 +98,63 @@ export default function AdjustPanel({
     return Math.max(rect.width / 1000, rect.height / 1500)
   }
 
+  // Deliberately NOT all six tabs: lighting and ambience are whole-canvas
+  // washes/scatters by nature (a Tint or Pool rect is the LAST thing
+  // painted, precisely so it colours everything underneath it) — if they
+  // were tap-selectable, a tap anywhere at all would keep hitting the
+  // lighting wash on top rather than whatever pandal/idol/flower is
+  // actually underneath, on any scene with that kind of lighting active.
+  // Tapping only ever selects things that are genuinely point-like objects
+  // (the pandal, the idol, a placed flower/decor sprig); lighting/ambience
+  // stay reachable only via the tabs, same as before.
+  const TAP_SELECTABLE_TARGETS = ['pandal', 'durga', 'flowers', 'decor'] as const
+
+  // What's actually under the finger, so touching the idol/pandal/a placed
+  // flower directly can select it — the bottom panel's tabs/chips stay as
+  // they were, this is an ADDITIONAL way in, not a replacement. The drag
+  // overlay div sits on top of the whole canvas (so a drag never has to
+  // land pixel-perfectly on a thin shape), which means a plain hit-test
+  // would only ever find that overlay — `elementsFromPoint` returns the
+  // full stack at that point, so this walks down it looking for the first
+  // real canvas element (an extra, or one of the tap-selectable adjustable
+  // layers — see `data-extra-id`/`data-adjust-target` in SceneCanvas.tsx)
+  // underneath.
+  function hitTest(clientX: number, clientY: number): { extraId: string } | { adjustTarget: typeof TAP_SELECTABLE_TARGETS[number] } | null {
+    for (const el of document.elementsFromPoint(clientX, clientY)) {
+      if (isElements) {
+        const hit = el.closest('[data-extra-id]')
+        if (hit) return { extraId: hit.getAttribute('data-extra-id')! }
+      } else {
+        const hit = el.closest('[data-adjust-target]')
+        const value = hit?.getAttribute('data-adjust-target')
+        if (value && (TAP_SELECTABLE_TARGETS as readonly string[]).includes(value)) {
+          return { adjustTarget: value as typeof TAP_SELECTABLE_TARGETS[number] }
+        }
+      }
+    }
+    return null
+  }
+
   function onPointerDown(e: React.PointerEvent) {
-    if (isElements && !current) return // nothing selected — a drag here would move nothing
+    const hit = hitTest(e.clientX, e.clientY)
+    let baseDx: number, baseDy: number
+
+    if (isElements) {
+      const hitId = hit && 'extraId' in hit ? hit.extraId : null
+      if (hitId && hitId !== selectedExtra) setSelectedExtra(hitId)
+      const active = extras.find(x => x.id === (hitId ?? selectedExtra))
+      if (!active) return // nothing selected, and nothing tappable under the finger either
+      baseDx = active.x
+      baseDy = active.y
+    } else {
+      const hitTargetVal = hit && 'adjustTarget' in hit ? hit.adjustTarget : null
+      if (hitTargetVal && hitTargetVal !== target) setTarget(hitTargetVal)
+      const activeAdjust = adjust[hitTargetVal ?? (target as typeof TAP_SELECTABLE_TARGETS[number])] ?? { dx: 0, dy: 0, scale: 1 }
+      baseDx = activeAdjust.dx
+      baseDy = activeAdjust.dy
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId)
-    const baseDx = isElements ? (current?.x ?? W / 2) : (layerAdjust?.dx ?? 0)
-    const baseDy = isElements ? (current?.y ?? H / 2) : (layerAdjust?.dy ?? 0)
     dragRef.current = { startX: e.clientX, startY: e.clientY, baseDx, baseDy, scale: canvasScale() }
     // Fade the control card out for the duration of the drag — it sits over
     // the bottom of the canvas, exactly where a lot of drags are headed

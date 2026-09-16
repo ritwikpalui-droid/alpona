@@ -80,9 +80,16 @@ export interface GiftVideoOptions {
    *  soundscape. Falls back to `sound` (or silence) if this browser can't
    *  capture audio from a media element — see `canUseCustomAudioFile`. */
   customAudio?: File | null
+  /** Where in `customAudio` to start playing, in seconds — the video is
+   *  only `GIFT_VIDEO_SECONDS` long, so for anything longer than that the
+   *  person picking the track gets to choose which few seconds of it
+   *  actually plays, rather than always the very beginning. Ignored (and
+   *  harmless) if `customAudio` is shorter than the clip or isn't set. */
+  customAudioStartSec?: number
 }
 
 const DURATION_MS = 6000
+export const GIFT_VIDEO_SECONDS = DURATION_MS / 1000
 const FPS = 24
 
 /* ------------------------------------------------------------------ */
@@ -295,6 +302,17 @@ export async function renderGiftVideo(
     audioEl = new Audio(customAudioUrl)
     audioEl.loop = true
     try {
+      // `currentTime` before metadata has loaded is silently clamped to 0
+      // in most browsers — the seek to the chosen start point only sticks
+      // once the file's real duration is known.
+      await new Promise<void>((resolve, reject) => {
+        audioEl!.addEventListener('loadedmetadata', () => resolve(), { once: true })
+        audioEl!.addEventListener('error', () => reject(new Error('audio failed to load')), { once: true })
+      })
+      const start = opts.customAudioStartSec ?? 0
+      if (start > 0 && Number.isFinite(audioEl.duration)) {
+        audioEl.currentTime = Math.max(0, Math.min(start, Math.max(0, audioEl.duration - 0.25)))
+      }
       await audioEl.play()
       usingCustomAudio = true
       tracks.push(...(audioEl as HTMLAudioElement & { captureStream(): MediaStream }).captureStream().getAudioTracks())

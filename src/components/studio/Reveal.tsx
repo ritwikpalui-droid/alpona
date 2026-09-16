@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { ExtraPlacement, Scene, SceneAdjust } from '@/lib/types'
 import { getAsset } from '@/lib/assets'
@@ -9,7 +9,7 @@ import {
   canShareFiles, CARD_TEMPLATES, downloadBlob, FORMATS, giftCardFilename, renderGiftCard, renderShareCard,
   shareCard, shareGiftCard, type CardTemplateId, type GiftCardMeta, type ShareFormat,
 } from '@/lib/export'
-import { canRecordVideo, canUseCustomAudioFile, renderGiftVideo } from '@/lib/giftVideo'
+import { canRecordVideo, canUseCustomAudioFile, GIFT_VIDEO_SECONDS, renderGiftVideo } from '@/lib/giftVideo'
 import { getOccasion, OCCASIONS, type OccasionId } from '@/lib/occasions'
 import SceneCanvas from '@/components/SceneCanvas'
 import AdjustPanel from './AdjustPanel'
@@ -52,6 +52,10 @@ export default function Reveal({
   const [animate, setAnimate] = useState(false)
   const [template, setTemplate] = useState<CardTemplateId>('classic')
   const [customAudio, setCustomAudio] = useState<File | null>(null)
+  // Where in the uploaded track to start — the clip is only a few seconds
+  // long, so for anything longer than that the person picking the track
+  // should get to choose which part plays, not always the very beginning.
+  const [customAudioStart, setCustomAudioStart] = useState(0)
   const [giftResult, setGiftResult] = useState<{ blob: Blob; ext: string; meta: GiftCardMeta; url: string } | null>(null)
   // Which action actually led to the 'gifted' screen — "Sent" was shown
   // either way, but Save never transmits anything anywhere (it's a local
@@ -130,7 +134,7 @@ export default function Reveal({
       if (giftResult) URL.revokeObjectURL(giftResult.url)
       if (animate) {
         const soundSpec = getAsset('sound', scene.sound)?.sound
-        const { blob, ext } = await renderGiftVideo(svgRef.current, format, meta, extras, soundSpec, { template, customAudio })
+        const { blob, ext } = await renderGiftVideo(svgRef.current, format, meta, extras, soundSpec, { template, customAudio, customAudioStartSec: customAudioStart })
         setGiftResult({ blob, ext, meta, url: URL.createObjectURL(blob) })
       } else {
         const blob = await renderGiftCard(svgRef.current, format, meta, template)
@@ -321,6 +325,7 @@ export default function Reveal({
                 template={template} setTemplate={setTemplate}
                 animate={animate} setAnimate={setAnimate}
                 customAudio={customAudio} setCustomAudio={setCustomAudio}
+                customAudioStart={customAudioStart} setCustomAudioStart={setCustomAudioStart}
                 busy={busy} error={error}
                 onBack={() => setPhase('reveal')}
                 onSubmit={doGift}
@@ -412,7 +417,8 @@ function PublishForm({
 
 function GiftForm({
   occasion, setOccasion, recipient, setRecipient, message, setMessage, from, setFrom,
-  template, setTemplate, animate, setAnimate, customAudio, setCustomAudio, busy, error, onBack, onSubmit,
+  template, setTemplate, animate, setAnimate, customAudio, setCustomAudio,
+  customAudioStart, setCustomAudioStart, busy, error, onBack, onSubmit,
 }: {
   occasion: OccasionId; setOccasion: (o: OccasionId) => void
   recipient: string; setRecipient: (v: string) => void
@@ -421,6 +427,7 @@ function GiftForm({
   template: CardTemplateId; setTemplate: (t: CardTemplateId) => void
   animate: boolean; setAnimate: (v: boolean) => void
   customAudio: File | null; setCustomAudio: (f: File | null) => void
+  customAudioStart: number; setCustomAudioStart: (s: number) => void
   busy: boolean; error: string | null
   onBack: () => void; onSubmit: () => void
 }) {
@@ -524,17 +531,27 @@ function GiftForm({
           <input
             type="file"
             accept="audio/*"
-            onChange={e => setCustomAudio(e.target.files?.[0] ?? null)}
+            onChange={e => { setCustomAudio(e.target.files?.[0] ?? null); setCustomAudioStart(0) }}
             className="block w-full text-[12px] text-ink-3 file:mr-3 file:rounded-full file:border-0 file:bg-ink file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-paper"
           />
           {customAudio && (
-            <button
-              type="button"
-              onClick={() => setCustomAudio(null)}
-              className="mt-1.5 text-[11.5px] text-ink-3 underline-offset-4 hover:underline"
-            >
-              Remove {customAudio.name}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => { setCustomAudio(null); setCustomAudioStart(0) }}
+                className="mt-1.5 text-[11.5px] text-ink-3 underline-offset-4 hover:underline"
+              >
+                Remove {customAudio.name}
+              </button>
+              {/* Keyed on the file's own identity, not just its presence —
+                  picking a DIFFERENT file should reset this component's
+                  local `duration`/`previewing` state outright rather than
+                  carrying over a stale duration from the last one. */}
+              <AudioTrimPicker
+                key={`${customAudio.name}-${customAudio.size}`}
+                file={customAudio} start={customAudioStart} setStart={setCustomAudioStart}
+              />
+            </>
           )}
         </label>
       )}
@@ -547,6 +564,69 @@ function GiftForm({
         </button>
       </div>
     </form>
+  )
+}
+
+/** Only shown once the uploaded file's own duration is known AND is longer
+ *  than the clip itself — a track shorter than the clip has nothing to
+ *  trim, it just plays from the top. Loads the file into its own throwaway
+ *  `<audio>` (never the one the recording actually uses) purely to read
+ *  `.duration` and to let the person hear the exact few seconds they're
+ *  about to pick, before committing to it. */
+function AudioTrimPicker({ file, start, setStart }: { file: File; start: number; setStart: (s: number) => void }) {
+  const [duration, setDuration] = useState<number | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file)
+    const el = new Audio(url)
+    audioRef.current = el
+    const onMeta = () => setDuration(el.duration)
+    el.addEventListener('loadedmetadata', onMeta)
+    return () => {
+      el.removeEventListener('loadedmetadata', onMeta)
+      el.pause()
+      URL.revokeObjectURL(url)
+      audioRef.current = null
+    }
+  }, [file])
+
+  const maxStart = duration != null ? Math.max(0, duration - GIFT_VIDEO_SECONDS) : 0
+  if (duration == null || maxStart <= 0) return null
+
+  function fmt(s: number) {
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${String(sec).padStart(2, '0')}`
+  }
+
+  function preview() {
+    const el = audioRef.current
+    if (!el || previewing) return
+    el.currentTime = start
+    void el.play()
+    setPreviewing(true)
+    setTimeout(() => { el.pause(); setPreviewing(false) }, GIFT_VIDEO_SECONDS * 1000)
+  }
+
+  return (
+    <div className="mt-2.5 border-t border-ink/10 pt-2.5">
+      <div className="mb-1.5 flex items-center justify-between text-[11.5px] text-ink-3">
+        <span>Clip starts at {fmt(start)} of {fmt(duration)}</span>
+        <button
+          type="button" onClick={preview} disabled={previewing}
+          className="font-medium text-ink-2 underline-offset-4 hover:underline disabled:opacity-40"
+        >
+          {previewing ? `Playing… ${GIFT_VIDEO_SECONDS}s` : `▶ Preview ${GIFT_VIDEO_SECONDS}s`}
+        </button>
+      </div>
+      <input
+        type="range" min={0} max={maxStart} step={0.5} value={Math.min(start, maxStart)}
+        onChange={e => setStart(Number(e.target.value))}
+        className="w-full accent-ink"
+      />
+    </div>
   )
 }
 
