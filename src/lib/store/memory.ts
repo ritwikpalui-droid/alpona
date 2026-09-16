@@ -131,13 +131,16 @@ function sorted(board: Board): Row[] {
     case 'recent': return all.sort((a, b) => b.createdAt - a.createdAt)
     // "Overall" and "Most Loved" used to be the exact same sort — two tabs
     // a visitor could tap between and see zero difference, which reads as
-    // one of them being broken. Genuinely distinct now: "Most Loved" is
-    // pure crowd vote count (what the label says, nothing else); "Overall"
-    // additionally surfaces editor's picks first — a curated "best of
-    // everything" view rather than a second identical vote-count ranking.
+    // one of them being broken. An earlier fix put editor's-pick FIRST,
+    // ahead of vote count — which produced something worse: a card badged
+    // "#1" with fewer votes than the card badged "#2" right below it,
+    // visibly contradicting its own rank number. Votes stay primary here
+    // (a "#1" badge must never show fewer votes than "#2" — that's not
+    // negotiable), and editor's-pick only breaks a tie between equally-
+    // voted posts, same idea, without the contradiction.
     case 'overall':
       return all.sort((a, b) =>
-        (b.editorsPick ? 1 : 0) - (a.editorsPick ? 1 : 0) || b.votes - a.votes || b.createdAt - a.createdAt)
+        b.votes - a.votes || (b.editorsPick ? 1 : 0) - (a.editorsPick ? 1 : 0) || b.createdAt - a.createdAt)
     case 'loved':
     default: return all.sort((a, b) => b.votes - a.votes || b.createdAt - a.createdAt)
   }

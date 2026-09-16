@@ -58,11 +58,20 @@ export function canUseCustomAudioFile(): boolean {
 
 interface MimeChoice { mimeType: string; ext: string }
 
+// MP4 first: reported working for the animated card everywhere WebM's own
+// native share sheet was rejecting it with a bare permission error even
+// after canShare() said yes — Android's share-target resolution for video
+// files has historically been less consistent for WebM than for the far
+// more universally-recognised MP4/H.264. Still falls through to WebM (then
+// plain webm, mp4 unqualified) on whatever can't actually record MP4 —
+// `isTypeSupported` decides per-browser, this only changes which supported
+// option is tried first.
 const CANDIDATES: MimeChoice[] = [
+  { mimeType: 'video/mp4;codecs=h264,aac', ext: 'mp4' },
+  { mimeType: 'video/mp4', ext: 'mp4' },
   { mimeType: 'video/webm;codecs=vp9,opus', ext: 'webm' },
   { mimeType: 'video/webm;codecs=vp8,opus', ext: 'webm' },
   { mimeType: 'video/webm', ext: 'webm' },
-  { mimeType: 'video/mp4', ext: 'mp4' },
 ]
 
 function pickMimeType(): MimeChoice | null {

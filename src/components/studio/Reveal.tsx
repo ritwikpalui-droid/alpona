@@ -353,7 +353,7 @@ export default function Reveal({
                 {giftAction === 'save' && (
                   <p className="mb-4 text-[13px] text-ink-2">
                     Saved to your device — open WhatsApp, Instagram or however you&apos;d send a
-                    photo, and send it on{recipient ? ` to ${recipient}` : ''} yourself.
+                    {giftResult?.ext === 'png' ? ' photo' : ' video'}, and send it on{recipient ? ` to ${recipient}` : ''} yourself.
                   </p>
                 )}
                 <button type="button" onClick={() => setPhase('reveal')} className="w-full rounded-full bg-ink px-5 py-3 text-[14px] font-medium text-paper transition-transform duration-300 hover:scale-[1.015] active:scale-[0.98]">

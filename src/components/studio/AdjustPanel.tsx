@@ -236,7 +236,13 @@ export default function AdjustPanel({
     const radius = n === 0 ? 0 : 70 + (n - 1) * 36
     const cx = W / 2 + Math.cos(angle) * radius
     const cy = H * 0.62 + Math.sin(angle) * radius * 0.6
-    const next: ExtraPlacement = { id, motif, x: cx + jitter(40), y: cy + jitter(40), scale: 1 }
+    // `H * 0.62` was tuned against the mobile viewport's own aspect ratio —
+    // on a wide, short desktop window the same canvas-space point can fall
+    // entirely underneath the (much taller, relative to that viewport) open
+    // panel, so a newly-added element rendered fully invisible with no cue
+    // anything happened. Reusing the drag clamp here means a fresh element
+    // is born inside the same safe zone dragging one out of is bounded by.
+    const next: ExtraPlacement = { id, motif, x: cx + jitter(40), y: clampExtraY(cy + jitter(40)), scale: 1 }
     onExtrasChange([...extras, next])
     setSelectedExtra(id)
   }
