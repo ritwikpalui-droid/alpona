@@ -7,7 +7,7 @@ export type CategoryId =
 
 export type Terrain =
   | 'river' | 'urban' | 'mountain' | 'forest' | 'sea'
-  | 'plain' | 'rooftop' | 'interior'
+  | 'plain' | 'rooftop' | 'interior' | 'space'
 
 export type TimeOfDay = 'dawn' | 'day' | 'golden' | 'dusk' | 'night'
 
