@@ -22,6 +22,8 @@ export const LIMITS = {
   /** Publishing is rare and expensive: 3, then one every 10 minutes. */
   publish: { capacity: 3, refillPerSec: 1 / 600 } satisfies Limit,
   report: { capacity: 5, refillPerSec: 1 / 120 } satisfies Limit,
+  /** Same shape as `publish` — a gift link is just as rare/expensive to mint. */
+  giftPublish: { capacity: 3, refillPerSec: 1 / 600 } satisfies Limit,
 } as const
 
 export function take(key: string, limit: Limit, cost = 1): boolean {

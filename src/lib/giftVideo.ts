@@ -250,12 +250,36 @@ interface BakedExtra {
   seed: number
 }
 
+/**
+ * Whether a just-recorded blob actually carries decodable audio.
+ * `MediaRecorder.isTypeSupported()` only promises the codec string is
+ * recognised — not that this specific device's encoder keeps the audio
+ * track once it's muxed into that container. Some Android builds have been
+ * seen recording a perfectly playable MP4 with the audio track silently
+ * dropped (desktop Chromium keeps it fine with the identical call), which
+ * is exactly the "music is gone after I send it" failure mode this guards
+ * against. Decoding the actual bytes is the only way to know for sure.
+ */
+async function blobHasAudio(blob: Blob): Promise<boolean> {
+  const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!Ctor) return true // can't check on this browser — assume yes rather than force a pointless re-record
+  const ctx = new Ctor()
+  try {
+    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer())
+    return decoded.numberOfChannels > 0 && decoded.length > 0
+  } catch {
+    return false
+  } finally {
+    await ctx.close()
+  }
+}
+
 export async function renderGiftVideo(
   svg: SVGSVGElement, format: ShareFormat, meta: GiftCardMeta, extras: ExtraPlacement[],
   sound: SoundSpec | undefined, opts: GiftVideoOptions = {},
 ): Promise<GiftVideoResult> {
-  const mime = pickMimeType()
-  if (!mime) throw new Error('This browser cannot record a video.')
+  const primaryMime = pickMimeType()
+  if (!primaryMime) throw new Error('This browser cannot record a video.')
 
   const template = opts.template ?? 'classic'
   const { w, h } = FORMATS[format]
@@ -292,106 +316,133 @@ export async function renderGiftVideo(
   if (!overlayCtx) throw new Error('Canvas is unavailable in this browser.')
   drawGiftCardChrome(overlayCtx, w, h, format, meta, template, rect)
 
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas is unavailable in this browser.')
+  // One recording pass with a given codec candidate. Everything above is
+  // baked once and shared across attempts; this is the only part that ever
+  // needs to run twice (see the mime-fallback note below `attempt`'s call
+  // site) — it owns its own canvas/stream/recorder so a second pass starts
+  // completely clean rather than reusing anything from the first.
+  async function attempt(mime: MimeChoice): Promise<{ result: GiftVideoResult; hasAudioTrack: boolean }> {
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas is unavailable in this browser.')
 
-  const stream = (canvas as HTMLCanvasElement & { captureStream(fps?: number): MediaStream }).captureStream(FPS)
-  const tracks = stream.getVideoTracks() as MediaStreamTrack[]
+    const stream = (canvas as HTMLCanvasElement & { captureStream(fps?: number): MediaStream }).captureStream(FPS)
+    const tracks = stream.getVideoTracks() as MediaStreamTrack[]
 
-  // Custom audio wins outright over the scene's synthesised soundscape —
-  // the person picked a specific track, not "also play this."
-  let audioEl: HTMLAudioElement | null = null
-  let customAudioUrl: string | null = null
-  let usingCustomAudio = false
-  if (opts.customAudio && canUseCustomAudioFile()) {
-    customAudioUrl = URL.createObjectURL(opts.customAudio)
-    audioEl = new Audio(customAudioUrl)
-    audioEl.loop = true
-    try {
-      // `currentTime` before metadata has loaded is silently clamped to 0
-      // in most browsers — the seek to the chosen start point only sticks
-      // once the file's real duration is known.
-      await new Promise<void>((resolve, reject) => {
-        audioEl!.addEventListener('loadedmetadata', () => resolve(), { once: true })
-        audioEl!.addEventListener('error', () => reject(new Error('audio failed to load')), { once: true })
-      })
-      const start = opts.customAudioStartSec ?? 0
-      if (start > 0 && Number.isFinite(audioEl.duration)) {
-        audioEl.currentTime = Math.max(0, Math.min(start, Math.max(0, audioEl.duration - 0.25)))
+    // Custom audio wins outright over the scene's synthesised soundscape —
+    // the person picked a specific track, not "also play this."
+    let audioEl: HTMLAudioElement | null = null
+    let customAudioUrl: string | null = null
+    let usingCustomAudio = false
+    if (opts.customAudio && canUseCustomAudioFile()) {
+      customAudioUrl = URL.createObjectURL(opts.customAudio)
+      audioEl = new Audio(customAudioUrl)
+      audioEl.loop = true
+      try {
+        // `currentTime` before metadata has loaded is silently clamped to 0
+        // in most browsers — the seek to the chosen start point only sticks
+        // once the file's real duration is known.
+        await new Promise<void>((resolve, reject) => {
+          audioEl!.addEventListener('loadedmetadata', () => resolve(), { once: true })
+          audioEl!.addEventListener('error', () => reject(new Error('audio failed to load')), { once: true })
+        })
+        const start = opts.customAudioStartSec ?? 0
+        if (start > 0 && Number.isFinite(audioEl.duration)) {
+          audioEl.currentTime = Math.max(0, Math.min(start, Math.max(0, audioEl.duration - 0.25)))
+        }
+        await audioEl.play()
+        usingCustomAudio = true
+        tracks.push(...(audioEl as HTMLAudioElement & { captureStream(): MediaStream }).captureStream().getAudioTracks())
+      } catch {
+        // Playback failed (bad/unsupported file) — fall through to the
+        // scene's own soundscape instead of recording a silent video.
+        audioEl = null
       }
-      await audioEl.play()
-      usingCustomAudio = true
-      tracks.push(...(audioEl as HTMLAudioElement & { captureStream(): MediaStream }).captureStream().getAudioTracks())
-    } catch {
-      // Playback failed (bad/unsupported file) — fall through to the
-      // scene's own soundscape instead of recording a silent video.
-      audioEl = null
     }
-  }
-  const usingSynthSound = !usingCustomAudio
-    && !!sound && Object.values(sound).some(v => typeof v === 'number' && v > 0)
-  if (usingSynthSound) {
-    await playSound(sound)
-    tracks.push(...captureAudioStream().getAudioTracks())
-  }
-
-  const recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: mime.mimeType })
-  const chunks: Blob[] = []
-  recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
-
-  const finished = new Promise<void>((resolve, reject) => {
-    recorder.onstop = () => resolve()
-    recorder.onerror = () => reject(new Error('Recording failed.'))
-  })
-
-  let raf = 0
-  const start = performance.now()
-
-  const paint = () => {
-    const t = (performance.now() - start) / 1000
-
-    ctx.fillStyle = PAPER
-    ctx.fillRect(0, 0, w, h)
-
-    ctx.save()
-    clipArtwork(ctx, rect)
-    ctx.drawImage(chromeBase, 0, 0)
-
-    for (const e of bakedExtras) {
-      const pose = poseFor(e.behavior.motion, t, e.seed)
-      const alpha = e.behavior.blinks ? blinkAlpha(t, e.seed) : 1
-      drawPosedBitmap(ctx, e.bitmap, e.pivot, pose, alpha)
+    const usingSynthSound = !usingCustomAudio
+      && !!sound && Object.values(sound).some(v => typeof v === 'number' && v > 0)
+    if (usingSynthSound) {
+      await playSound(sound)
+      tracks.push(...captureAudioStream().getAudioTracks())
     }
 
-    // The lighting wash: brightness only, never a translate/rotate — see
-    // the file-level note on why a colour wash never "swings."
-    drawPosedBitmap(ctx, lightingBase, ZERO_PIVOT, IDENTITY_POSE, blinkAlpha(t, 0))
+    const recorder = new MediaRecorder(new MediaStream(tracks), { mimeType: mime.mimeType })
+    const chunks: Blob[] = []
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) }
 
-    ctx.restore() // end clipArtwork
+    const finished = new Promise<void>((resolve, reject) => {
+      recorder.onstop = () => resolve()
+      recorder.onerror = () => reject(new Error('Recording failed.'))
+    })
 
-    ctx.drawImage(overlay, 0, 0)
+    let raf = 0
+    const start = performance.now()
 
-    if (performance.now() - start < DURATION_MS) {
-      raf = requestAnimationFrame(paint)
-    } else {
-      recorder.stop()
+    const paint = () => {
+      const t = (performance.now() - start) / 1000
+
+      ctx.fillStyle = PAPER
+      ctx.fillRect(0, 0, w, h)
+
+      ctx.save()
+      clipArtwork(ctx, rect)
+      ctx.drawImage(chromeBase, 0, 0)
+
+      for (const e of bakedExtras) {
+        const pose = poseFor(e.behavior.motion, t, e.seed)
+        const alpha = e.behavior.blinks ? blinkAlpha(t, e.seed) : 1
+        drawPosedBitmap(ctx, e.bitmap, e.pivot, pose, alpha)
+      }
+
+      // The lighting wash: brightness only, never a translate/rotate — see
+      // the file-level note on why a colour wash never "swings."
+      drawPosedBitmap(ctx, lightingBase, ZERO_PIVOT, IDENTITY_POSE, blinkAlpha(t, 0))
+
+      ctx.restore() // end clipArtwork
+
+      ctx.drawImage(overlay, 0, 0)
+
+      if (performance.now() - start < DURATION_MS) {
+        raf = requestAnimationFrame(paint)
+      } else {
+        recorder.stop()
+      }
+    }
+
+    recorder.start()
+    raf = requestAnimationFrame(paint)
+
+    try {
+      await finished
+    } finally {
+      cancelAnimationFrame(raf)
+      if (usingSynthSound) stopSound()
+      if (audioEl) audioEl.pause()
+      if (customAudioUrl) URL.revokeObjectURL(customAudioUrl)
+    }
+
+    return {
+      result: { blob: new Blob(chunks, { type: mime.mimeType }), ext: mime.ext, mimeType: mime.mimeType },
+      hasAudioTrack: usingCustomAudio || usingSynthSound,
     }
   }
 
-  recorder.start()
-  raf = requestAnimationFrame(paint)
-
-  try {
-    await finished
-  } finally {
-    cancelAnimationFrame(raf)
-    if (usingSynthSound) stopSound()
-    if (audioEl) audioEl.pause()
-    if (customAudioUrl) URL.revokeObjectURL(customAudioUrl)
+  const first = await attempt(primaryMime)
+  if (!first.hasAudioTrack || (await blobHasAudio(first.result.blob))) {
+    return first.result
   }
 
-  return { blob: new Blob(chunks, { type: mime.mimeType }), ext: mime.ext, mimeType: mime.mimeType }
+  // The chosen codec produced a perfectly playable video, but its audio
+  // track didn't actually survive being muxed in on this device — this is
+  // the real bug behind "the music isn't there once I've sent it": the
+  // gift video looked fine right up until someone actually pressed play
+  // with sound on. WebM+Opus is the one combination that has reliably kept
+  // audio everywhere this has been tested, so re-record once with that
+  // instead of silently handing back a musicless "gift video."
+  const webmFallback = CANDIDATES.find(c => c.ext === 'webm' && MediaRecorder.isTypeSupported(c.mimeType))
+  if (!webmFallback || webmFallback.mimeType === primaryMime.mimeType) return first.result
+  const second = await attempt(webmFallback)
+  return second.result
 }

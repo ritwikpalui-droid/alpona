@@ -63,6 +63,36 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* --------------------------------------------------- send a gift, too
+          Additive, not a replacement for the hero above — the Puja scene
+          builder stays the main act; these are two other kinds of "digital
+          impression" someone can send, reachable right below it. */}
+      <section className="mx-auto max-w-4xl px-5 pb-4 sm:px-8">
+        <p className="eyebrow mb-3 text-center text-ink-3">Or send a gift</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Link
+            href="/bouquet"
+            className="card-paper flex items-center gap-4 rounded-3xl p-5 transition-transform duration-300 hover:scale-[1.01]"
+          >
+            <span className="text-[36px]">💐</span>
+            <span>
+              <span className="display block text-[17px] text-ink">Send a Bouquet</span>
+              <span className="block text-[13px] text-ink-2">Pick flowers and a holder — they hold and turn it themselves</span>
+            </span>
+          </Link>
+          <Link
+            href="/chocolate"
+            className="card-paper flex items-center gap-4 rounded-3xl p-5 transition-transform duration-300 hover:scale-[1.01]"
+          >
+            <span className="text-[36px]">🍫</span>
+            <span>
+              <span className="display block text-[17px] text-ink">Send Chocolate</span>
+              <span className="block text-[13px] text-ink-2">Pack a box, they open the lid themselves</span>
+            </span>
+          </Link>
+        </div>
+      </section>
+
       {/* ---------------------------------------------------- people building */}
       <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
         <div className="mb-7 flex items-end justify-between gap-4">
