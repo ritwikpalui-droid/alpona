@@ -16,14 +16,18 @@ export const alt = 'A gift, wrapped'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const KIND_EMOJI: Record<string, string> = { bouquet: '💐', chocolate: '🍫' }
+const KIND_EMOJI: Record<string, string> = { bouquet: '💐', chocolate: '🍫', mishti: '🍬' }
 
 export default async function Image({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const gift = await giftStore.get(id)
 
   const swatch = gift
-    ? (gift.build.kind === 'bouquet' ? getHolder(gift.build.holderId)?.swatch : getBox(gift.build.boxId)?.swatch)
+    ? (gift.build.kind === 'bouquet'
+        ? getHolder(gift.build.holderId)?.swatch
+        : gift.build.kind === 'mishti'
+          ? (await import('@/lib/gift/mishtiBoxes')).getBox(gift.build.boxId)?.swatch
+          : getBox(gift.build.boxId)?.swatch)
     : undefined
   const c1 = swatch ?? '#D08C8C'
   const title = gift?.title ?? 'A gift, wrapped'

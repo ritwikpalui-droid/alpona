@@ -6,7 +6,7 @@
  * (abundant-spinning-platypus.md) for why.
  */
 
-export type ImpressionKind = 'bouquet' | 'chocolate'
+export type ImpressionKind = 'bouquet' | 'chocolate' | 'mishti'
 
 export interface BouquetItem {
   id: string
@@ -33,7 +33,19 @@ export interface ChocolateBuild {
   items: ChocolateItemBuild[]
 }
 
-export type ImpressionBuild = BouquetBuild | ChocolateBuild
+export interface MishtiItemBuild {
+  id: string
+  itemId: string
+}
+
+export interface MishtiBuild {
+  kind: 'mishti'
+  boxId: string
+  boxColor?: string
+  items: MishtiItemBuild[]
+}
+
+export type ImpressionBuild = BouquetBuild | ChocolateBuild | MishtiBuild
 
 export interface PublishedImpression {
   id: string

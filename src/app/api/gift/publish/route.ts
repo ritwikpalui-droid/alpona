@@ -8,6 +8,7 @@ import { getAsset } from '@/lib/assets'
 const DEFAULT_TITLE: Record<string, string> = {
   bouquet: 'A Bouquet, For You',
   chocolate: 'A Little Something Sweet',
+  mishti: 'A Sweet Kolkata Treat',
 }
 
 export async function POST(req: Request) {

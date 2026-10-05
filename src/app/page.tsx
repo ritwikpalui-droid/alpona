@@ -69,7 +69,7 @@ export default async function Home() {
           impression" someone can send, reachable right below it. */}
       <section className="mx-auto max-w-4xl px-5 pb-4 sm:px-8">
         <p className="eyebrow mb-3 text-center text-ink-3">Or send a gift</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Link
             href="/bouquet"
             className="card-paper flex items-center gap-4 rounded-3xl p-5 transition-transform duration-300 hover:scale-[1.01]"
@@ -88,6 +88,16 @@ export default async function Home() {
             <span>
               <span className="display block text-[17px] text-ink">Send Chocolate</span>
               <span className="block text-[13px] text-ink-2">Pack a box, they open the lid themselves</span>
+            </span>
+          </Link>
+          <Link
+            href="/mishti"
+            className="card-paper flex items-center gap-4 rounded-3xl p-5 transition-transform duration-300 hover:scale-[1.01]"
+          >
+            <span className="text-[36px]">🍬</span>
+            <span>
+              <span className="display block text-[17px] text-ink">Send Mishti</span>
+              <span className="block text-[13px] text-ink-2">Choose a box and a Kolkata favourite — Rosogolla, Sandesh, and more</span>
             </span>
           </Link>
         </div>

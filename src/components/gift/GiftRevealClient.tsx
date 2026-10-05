@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import BouquetView from './BouquetView'
 import ChocolateBoxView, { WOBBLE_LIMIT_DEG } from './ChocolateBoxView'
+import MishtiBoxView from './MishtiBoxView'
 import ImpressionViewer from './ImpressionViewer'
 import { getAsset } from '@/lib/assets'
 import { playSound, stopSound, setMuted, isMuted } from '@/lib/audio'
@@ -13,7 +14,7 @@ function clampWobble(next: number): number {
   return Math.max(-WOBBLE_LIMIT_DEG, Math.min(WOBBLE_LIMIT_DEG, signed))
 }
 
-const KIND_EMOJI: Record<string, string> = { bouquet: '💐', chocolate: '🍫' }
+const KIND_EMOJI: Record<string, string> = { bouquet: '💐', chocolate: '🍫', mishti: '🍬' }
 
 /**
  * The recipient's own two-stage reveal — a sealed flat card first, the
@@ -80,14 +81,16 @@ export default function GiftRevealClient({ gift }: { gift: PublishedImpression }
         >
           {gift.build.kind === 'bouquet' ? (
             <BouquetView holderId={gift.build.holderId} holderColor={gift.build.holderColor} items={gift.build.items} angleDeg={angle} size={300} />
+          ) : gift.build.kind === 'mishti' ? (
+            <MishtiBoxView boxId={gift.build.boxId} boxColor={gift.build.boxColor} items={gift.build.items} angleDeg={angle} open={open} size={300} />
           ) : (
             <ChocolateBoxView boxId={gift.build.boxId} boxColor={gift.build.boxColor} items={gift.build.items} angleDeg={angle} open={open} size={300} />
           )}
         </ImpressionViewer>
         <p className="mt-1 text-[11.5px] text-ink-3">
-          {gift.build.kind === 'chocolate' ? 'Drag to tilt it' : 'Drag to turn it in your hand'}
+          {gift.build.kind === 'bouquet' ? 'Drag to turn it in your hand' : 'Drag to tilt it'}
         </p>
-        {gift.build.kind === 'chocolate' && (
+        {(gift.build.kind === 'chocolate' || gift.build.kind === 'mishti') && (
           <button type="button" onClick={() => setOpen(o => !o)}
             className="mt-3 rounded-full border border-ink/14 px-4 py-2 text-[13px] text-ink-2 hover:text-ink">
             {open ? 'Close the lid' : 'Open the lid'}

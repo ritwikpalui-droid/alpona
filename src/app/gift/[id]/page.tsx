@@ -6,7 +6,7 @@ import { giftStore } from '@/lib/gift/store'
 
 interface Props { params: Promise<{ id: string }> }
 
-const KIND_LABEL: Record<string, string> = { bouquet: 'bouquet', chocolate: 'box of chocolates' }
+const KIND_LABEL: Record<string, string> = { bouquet: 'bouquet', chocolate: 'box of chocolates', mishti: 'box of mishti' }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
